@@ -1,5 +1,5 @@
 /*===================================================*
-|  field-reflection version v0.0.1                   |
+|  field-reflection version v0.1.0                   |
 |  https://github.com/yosh-matsuda/field-reflection  |
 |                                                    |
 |  Copyright (c) 2024 Yoshiki Matsuda @yosh-matsuda  |
