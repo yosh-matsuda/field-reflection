@@ -18,6 +18,14 @@
 #include <type_traits>
 #include <utility>
 
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wmissing-braces"
+#pragma clang diagnostic ignored "-Wundefined-inline"
+#pragma clang diagnostic ignored "-Wundefined-internal"
+#pragma clang diagnostic ignored "-Wmissing-field-initializers"
+#endif
+
 namespace field_reflection
 {
     namespace detail
@@ -822,3 +830,7 @@ namespace field_reflection
                                          std::make_index_sequence<field_count<U>>());
     }
 }  // namespace field_reflection
+
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
