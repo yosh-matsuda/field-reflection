@@ -1,6 +1,8 @@
 # field-reflection C++
 
-Static reflection for C++ to get field names and types from a struct/class.
+Compile-time reflection for C++ to get field names and types from a struct/class.
+
+[![CI](https://github.com/yosh-matsuda/field-reflection/actions/workflows/tests.yml/badge.svg)](https://github.com/yosh-matsuda/field-reflection/actions/workflows/tests.yml)
 
 ## Features
 
@@ -86,11 +88,11 @@ template<typename T>
 concept field_namable;
 ```
 
-The `field_countable` is a concept that checks if the type `T` is a field-countable struct. Internally, it is equivalent to that `T` is [aggregate type](https://en.cppreference.com/w/cpp/types/is_aggregate) and the number field is less than or equal to `100`.
+The `field_countable` is a concept that checks if the type `T` is a field-countable struct. Internally, it is equivalent to that `T` is [aggregate type](https://en.cppreference.com/w/cpp/types/is_aggregate) and the number of the field is less than or equal to `100`.
 
-The `field_referenceable` is a concept that checks if a field of the type `T` can be referenced by index. This also satisfies the `field_countable` concept.
+The `field_referenceable` is a concept that checks if a field of the type `T` can be referenced by index. This includes the `field_countable` concept. The implementation of the `field_referenceable` concept is the condition that the `field_countable` type `T` has no base class.
 
-The `field_namable` is a concept that checks if a field name of the type `T` can be obtained by index statically. This also satisfies the `field_referenceable` concept.
+The `field_namable` is a concept that checks if a field name of the type `T` can be obtained by index statically. This includes the `field_referenceable` concept and also requires that the type `T` has a field and (practically) there is no reference type member.
 
 ### `field_count`
 
@@ -211,6 +213,6 @@ Copy a `field_referenceable` type `T` object and convert it to `std::tuple` wher
 This project is strongly inspired by the following and stands as
 
 * an alternative to [visit_struct](https://github.com/cbeck88/visit_struct) without macros,
-* a reflection library that is a partial reimplementation of [reflect-cpp](https://github.com/getml/reflect-cpp) and [glaze](https://github.com/stephenberry/glaze).
+* a reflection library that is a partial reimplementation of [reflect-cpp](https://github.com/getml/reflect-cpp).
 
 The C++20 implementation of the counting field in this library is partially referenced to [Boost.PFR](https://github.com/boostorg/pfr).

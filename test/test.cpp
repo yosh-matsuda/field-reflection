@@ -67,6 +67,37 @@ struct my_struct8
     double& d;
 };
 
+// local struct
+auto func()
+{
+    struct local_struct
+    {
+        int a;
+    };
+    return local_struct{};
+}
+using my_struct9 = decltype(func());
+
+// struct in namespace
+namespace named
+{
+    struct my_struct10
+    {
+        int x0;
+        double y0;
+    };
+}  // namespace named
+
+// struct in unnamed namespace
+namespace
+{
+    struct my_struct11
+    {
+        int x1;
+        double y1;
+    };
+}  // namespace
+
 TEST(field_reflection, concept)
 {
     static_assert(field_countable<my_struct1>);
@@ -77,6 +108,9 @@ TEST(field_reflection, concept)
     static_assert(field_countable<my_struct6>);
     static_assert(field_countable<my_struct7>);
     static_assert(!field_countable<my_struct8>);
+    static_assert(field_countable<my_struct9>);
+    static_assert(field_countable<named::my_struct10>);
+    static_assert(field_countable<my_struct11>);
 
     static_assert(field_referenceable<my_struct1>);
     static_assert(field_referenceable<my_struct2>);
@@ -86,6 +120,9 @@ TEST(field_reflection, concept)
     static_assert(!field_referenceable<my_struct6>);
     static_assert(!field_referenceable<my_struct7>);
     static_assert(!field_referenceable<my_struct8>);
+    static_assert(field_referenceable<my_struct9>);
+    static_assert(field_referenceable<named::my_struct10>);
+    static_assert(field_referenceable<my_struct11>);
 
     static_assert(field_namable<my_struct1>);
     static_assert(!field_namable<my_struct2>);
@@ -95,6 +132,9 @@ TEST(field_reflection, concept)
     static_assert(!field_namable<my_struct6>);
     static_assert(!field_namable<my_struct7>);
     static_assert(!field_namable<my_struct8>);
+    static_assert(field_namable<my_struct9>);
+    static_assert(field_namable<named::my_struct10>);
+    static_assert(field_namable<my_struct11>);
 }
 
 TEST(field_reflection, field_count)
@@ -106,6 +146,9 @@ TEST(field_reflection, field_count)
     static_assert(field_count<my_struct5> == 1);
     static_assert(field_count<my_struct6> == 5);
     static_assert(field_count<my_struct7> == 6);
+    static_assert(field_count<my_struct9> == 1);
+    static_assert(field_count<named::my_struct10> == 2);
+    static_assert(field_count<my_struct11> == 2);
 }
 
 TEST(field_reflection, field_type)
@@ -124,6 +167,14 @@ TEST(field_reflection, field_type)
 
     static_assert(std::is_same_v<field_type<my_struct4, 0>, decltype(std::declval<my_struct4>().i)>);
     static_assert(std::is_same_v<field_type<my_struct5, 0>, decltype(std::declval<my_struct5>().m)>);
+
+    static_assert(std::is_same_v<field_type<my_struct9, 0>, decltype(std::declval<my_struct9>().a)>);
+
+    static_assert(std::is_same_v<field_type<named::my_struct10, 0>, decltype(std::declval<named::my_struct10>().x0)>);
+    static_assert(std::is_same_v<field_type<named::my_struct10, 1>, decltype(std::declval<named::my_struct10>().y0)>);
+
+    static_assert(std::is_same_v<field_type<my_struct11, 0>, decltype(std::declval<my_struct11>().x1)>);
+    static_assert(std::is_same_v<field_type<my_struct11, 1>, decltype(std::declval<my_struct11>().y1)>);
 }
 
 TEST(field_reflection, field_name)
@@ -136,6 +187,13 @@ TEST(field_reflection, field_name)
 
     static_assert(field_name<my_struct4, 0> == "i");
     static_assert(field_name<my_struct5, 0> == "m");
+
+    static_assert(field_name<my_struct9, 0> == "a");
+
+    static_assert(field_name<named::my_struct10, 0> == "x0");
+    static_assert(field_name<named::my_struct10, 1> == "y0");
+    static_assert(field_name<my_struct11, 0> == "x1");
+    static_assert(field_name<my_struct11, 1> == "y1");
 }
 
 TEST(field_reflection, get_field)
@@ -217,6 +275,28 @@ TEST(field_reflection, get_field)
         auto ms5 = my_struct5{};
         EXPECT_EQ(get_field<0>(ms5), ms5.m);
         static_assert(std::is_same_v<decltype(get_field<0>(ms5)), decltype(ms5.m)&>);
+    }
+
+    {
+        auto ms9 = my_struct9{};
+        EXPECT_EQ(get_field<0>(ms9), ms9.a);
+        static_assert(std::is_same_v<decltype(get_field<0>(ms9)), decltype(ms9.a)&>);
+    }
+
+    {
+        auto ms10 = named::my_struct10{};
+        EXPECT_EQ(get_field<0>(ms10), ms10.x0);
+        EXPECT_EQ(get_field<1>(ms10), ms10.y0);
+        static_assert(std::is_same_v<decltype(get_field<0>(ms10)), decltype(ms10.x0)&>);
+        static_assert(std::is_same_v<decltype(get_field<1>(ms10)), decltype(ms10.y0)&>);
+    }
+
+    {
+        auto ms11 = my_struct11{};
+        EXPECT_EQ(get_field<0>(ms11), ms11.x1);
+        EXPECT_EQ(get_field<1>(ms11), ms11.y1);
+        static_assert(std::is_same_v<decltype(get_field<0>(ms11)), decltype(ms11.x1)&>);
+        static_assert(std::is_same_v<decltype(get_field<1>(ms11)), decltype(ms11.y1)&>);
     }
 }
 
@@ -356,5 +436,12 @@ TEST(field_reflection, any_of_field)
     EXPECT_FALSE(any_of_field(ms5_a, [](std::string_view, auto&) { return false; }));
     EXPECT_FALSE(any_of_field(ms5_a, ms5_b, [](auto&, auto&) { return false; }));
     EXPECT_FALSE(any_of_field(ms5_a, ms5_b, [](std::string_view, auto&, auto&) { return false; }));
+
+    auto ms9_a = my_struct9{};
+    auto ms9_b = my_struct9{};
+    EXPECT_FALSE(any_of_field(ms9_a, [](auto&) { return false; }));
+    EXPECT_FALSE(any_of_field(ms9_a, [](std::string_view, auto&) { return false; }));
+    EXPECT_FALSE(any_of_field(ms9_a, ms9_b, [](auto&, auto&) { return false; }));
+    EXPECT_FALSE(any_of_field(ms9_a, ms9_b, [](std::string_view, auto&, auto&) { return false; }));
 }
 // NOLINTEND
