@@ -19,7 +19,7 @@ C++20 compilers are required to use this library.
 * Clang >= 15
     * with libc++-16 or later
 * MSVC >= 19.37
-    * clang-cl >= 16
+    * clang-cl >= 17
 
 ## Usage
 
