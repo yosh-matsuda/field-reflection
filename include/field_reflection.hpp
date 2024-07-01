@@ -10,6 +10,7 @@
 
 #pragma once
 
+#include <cassert>
 #include <climits>  // CHAR_BIT
 #include <limits>
 #include <source_location>
@@ -582,7 +583,7 @@ namespace field_reflection
             static wrapper<T> fake;  // NOLINT
         };
 
-        template <typename T, size_t N>  // NOLINT
+        template <typename T, std::size_t N>  // NOLINT
         consteval auto get_ptr() noexcept
         {
 #if defined(__clang__)
