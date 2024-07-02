@@ -18,11 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        compiler:
-          [
-            { c: "clang-cl", cxx: "clang-cl" },
-            { c: "cl", cxx: "cl" },
-          ]
+        compiler: [{ c: "clang-cl", cxx: "clang-cl" }, { c: "cl", cxx: "cl" }]
     name: Windows - ${{ matrix.compiler.cxx }}
     runs-on: windows-latest
 
@@ -58,7 +54,6 @@ jobs:
           [
             { c: "gcc-11", cxx: "g++-11" },
             { c: "gcc-12", cxx: "g++-12" },
-            { c: "gcc-13", cxx: "g++-13" },
             {
               c: "$(brew --prefix llvm@15)/bin/clang",
               cxx: "$(brew --prefix llvm@15)/bin/clang++",
@@ -70,6 +65,10 @@ jobs:
             {
               c: "$(brew --prefix llvm@17)/bin/clang",
               cxx: "$(brew --prefix llvm@17)/bin/clang++",
+            },
+            {
+              c: "$(brew --prefix llvm@18)/bin/clang",
+              cxx: "$(brew --prefix llvm@18)/bin/clang++",
             },
           ]
     name: Ubuntu - ${{ matrix.compiler.cxx }}
@@ -86,10 +85,10 @@ jobs:
       - name: Install compilers
         run: |
           eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-          brew install ninja llvm@12 llvm@13 llvm@14 llvm@15 llvm@16 llvm@17
+          brew install ninja llvm@15 llvm@16 llvm@17 llvm@18
 
       - name: Install dependencies
-        run: CC=${{ matrix.compiler.c }} CXX=${{ matrix.compiler.cxx }} vcpkg install gtest --triplet ${{ env.triplet }}
+        run: vcpkg install gtest --triplet ${{ env.triplet }}
 
       - name: Build and test
         run: |
@@ -118,12 +117,16 @@ jobs:
               c: "$(brew --prefix llvm@17)/bin/clang",
               cxx: "$(brew --prefix llvm@17)/bin/clang++",
             },
+            {
+              c: "$(brew --prefix llvm@18)/bin/clang",
+              cxx: "$(brew --prefix llvm@18)/bin/clang++",
+            },
           ]
     name: MacOS - ${{ matrix.compiler.cxx }}
     runs-on: macos-latest
 
     env:
-      triplet: x64-osx
+      triplet: arm64-osx
 
     steps:
       - uses: actions/checkout@v4
@@ -131,7 +134,7 @@ jobs:
           submodules: true
 
       - name: Install compilers
-        run: brew install ninja llvm@12 llvm@13 llvm@14 llvm@15 llvm@16 llvm@17
+        run: brew install ninja llvm@16 llvm@17 llvm@18
 
       - name: Install dependencies
         run: CC=${{ matrix.compiler.c }} CXX=${{ matrix.compiler.cxx }} vcpkg install gtest --triplet ${{ env.triplet }}
