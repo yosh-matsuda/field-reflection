@@ -46,14 +46,52 @@ jobs:
           ctest --test-dir "${{ github.workspace }}\build" -C Release
         shell: bash
 
-  ubuntu-build:
+  ubuntu2204-build:
     strategy:
       fail-fast: false
       matrix:
         compiler:
           [
             { c: "gcc-11", cxx: "g++-11" },
+          ]
+    name: Ubuntu - ${{ matrix.compiler.cxx }}
+    runs-on: ubuntu-22.04
+
+    env:
+      triplet: x64-linux
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install compilers
+        run: |
+          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+          brew install ninja
+
+      - name: Install dependencies
+        run: vcpkg install gtest --triplet ${{ env.triplet }}
+
+      - name: Build and test
+        run: |
+          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+          rm -rf ${{ github.workspace }}/build
+          cmake -B ${{ github.workspace }}/build -DCMAKE_TOOLCHAIN_FILE=$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=${{ env.triplet }} -DCMAKE_CXX_COMPILER=${{ matrix.compiler.cxx }} -G "Ninja Multi-Config"
+          cmake --build ${{ github.workspace }}/build --config Debug --clean-first
+          ctest --test-dir ${{ github.workspace }}/build -C Debug
+          cmake --build ${{ github.workspace }}/build --config Release --clean-first
+          ctest --test-dir ${{ github.workspace }}/build -C Release
+
+  ubuntu2404-build:
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler:
+          [
             { c: "gcc-12", cxx: "g++-12" },
+            { c: "gcc-13", cxx: "g++-13" },
+            { c: "gcc-14", cxx: "g++-14" },
             {
               c: "$(brew --prefix llvm@15)/bin/clang",
               cxx: "$(brew --prefix llvm@15)/bin/clang++",
@@ -72,7 +110,7 @@ jobs:
             },
           ]
     name: Ubuntu - ${{ matrix.compiler.cxx }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     env:
       triplet: x64-linux
@@ -108,7 +146,7 @@ jobs:
           [
             { c: "gcc-11", cxx: "g++-11" },
             { c: "gcc-12", cxx: "g++-12" },
-            { c: "gcc-13", cxx: "g++-13" },
+            # { c: "gcc-13", cxx: "g++-13" },
             {
               c: "$(brew --prefix llvm@16)/bin/clang",
               cxx: "$(brew --prefix llvm@16)/bin/clang++",
@@ -137,12 +175,15 @@ jobs:
         run: brew install ninja llvm@16 llvm@17 llvm@18
 
       - name: Install dependencies
-        run: CC=${{ matrix.compiler.c }} CXX=${{ matrix.compiler.cxx }} vcpkg install gtest --triplet ${{ env.triplet }}
+        run: |
+          git clone --depth=1 https://github.com/microsoft/vcpkg.git
+          ./vcpkg/bootstrap-vcpkg.sh
+          CC=${{ matrix.compiler.c }} CXX=${{ matrix.compiler.cxx }} ./vcpkg/vcpkg install gtest --triplet ${{ env.triplet }}
 
       - name: Build and test
         run: |
           rm -rf ${{ github.workspace }}/build
-          cmake -B ${{ github.workspace }}/build -DCMAKE_TOOLCHAIN_FILE=$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=${{ env.triplet }} -DCMAKE_CXX_COMPILER=${{ matrix.compiler.cxx }} -G "Ninja Multi-Config"
+          cmake -B ${{ github.workspace }}/build -DCMAKE_TOOLCHAIN_FILE=./vcpkg/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=${{ env.triplet }} -DCMAKE_CXX_COMPILER=${{ matrix.compiler.cxx }} -G "Ninja Multi-Config"
           cmake --build ${{ github.workspace }}/build --config Debug --clean-first
           ctest --test-dir ${{ github.workspace }}/build -C Debug
           cmake --build ${{ github.workspace }}/build --config Release --clean-first
