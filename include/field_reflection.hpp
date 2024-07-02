@@ -89,24 +89,17 @@ namespace field_reflection
 #endif
 
         template <typename T, std::size_t ArgNum>
-        concept constructible = []() {
-            if constexpr (ArgNum == 0)
-            {
-                return requires { T{}; };
-            }
-            else if constexpr (std::is_copy_constructible_v<T>)
-            {
-                return []<std::size_t I0, std::size_t... Is>(std::index_sequence<I0, Is...>) {
-                    return requires { T{std::declval<any_lref_no_base<T, I0>>(), std::declval<any_lref<T, Is>>()...}; };
-                }(std::make_index_sequence<ArgNum>());
-            }
-            else
-            {
-                return []<std::size_t I0, std::size_t... Is>(std::index_sequence<I0, Is...>) {
-                    return requires { T{std::declval<any_rref_no_base<T, I0>>(), std::declval<any_rref<T, Is>>()...}; };
-                }(std::make_index_sequence<ArgNum>());
-            }
-        }();
+        concept constructible = (ArgNum == 0 && requires { T{}; }) ||
+                                []<std::size_t I0, std::size_t... Is>(std::index_sequence<I0, Is...>) {
+                                    if constexpr (std::is_copy_constructible_v<T>)
+                                    {
+                                        return requires { T{any_lref_no_base<T, I0>(), any_lref<T, Is>()...}; };
+                                    }
+                                    else
+                                    {
+                                        return requires { T{any_rref_no_base<T, I0>(), any_rref<T, Is>()...}; };
+                                    }
+                                }(std::make_index_sequence<ArgNum>());
 
         template <typename T>
         concept has_base = []() {
