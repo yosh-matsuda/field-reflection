@@ -612,6 +612,17 @@ namespace field_reflection
 #endif
         }
 
+        template <typename T>
+        consteval std::string_view get_function_name()
+        {
+#if defined(__clang__) && defined(_WIN32)
+            // clang-cl returns function_name() as __FUNCTION__ instead of __PRETTY_FUNCTION__
+            return std::string_view{__PRETTY_FUNCTION__};
+#else
+            return std::string_view{std::source_location::current().function_name()};
+#endif
+        }
+
         template <typename T, auto Ptr>
         consteval std::string_view get_field_name()
         {
@@ -645,6 +656,46 @@ namespace field_reflection
 
         template <field_referenceable T, std::size_t N>
         using field_type = remove_rvalue_reference_t<decltype(std::get<N>(to_tuple(std::declval<T&>())))>;
+
+        struct type_name_detector
+        {
+        };
+
+        template <typename T>
+        consteval std::string_view get_type_name()
+        {
+#if defined(__GNUC__) || defined(__clang__)
+            constexpr auto detector_name = get_function_name<type_name_detector>();
+            constexpr auto dummy = std::string_view("T = ");
+            constexpr auto dummy_begin = detector_name.find(dummy) + dummy.size();
+            constexpr auto dummy2 = std::string_view("type_name_detector");
+            constexpr auto dummy_suffix_length = detector_name.size() - detector_name.find(dummy2) - dummy2.size();
+
+            constexpr auto type_name_raw = get_function_name<T>();
+            return type_name_raw.substr(dummy_begin, type_name_raw.size() - dummy_begin - dummy_suffix_length);
+#else
+            constexpr auto detector_name = get_function_name<type_name_detector>();
+            constexpr auto dummy = std::string_view("struct field_reflection::detail::type_name_detector");
+            constexpr auto dummy_begin = detector_name.find(dummy);
+            constexpr auto dummy_suffix_length = detector_name.size() - dummy_begin - dummy.size();
+
+            auto type_name_raw = get_function_name<T>();
+            auto type_name =
+                type_name_raw.substr(dummy_begin, type_name_raw.size() - dummy_begin - dummy_suffix_length);
+            if (auto s = std::string_view("struct "); type_name.starts_with(s))
+            {
+                type_name.remove_prefix(s.size());
+            }
+            if (auto s = std::string_view("class "); type_name.starts_with(s))
+            {
+                type_name.remove_prefix(s.size());
+            }
+            return type_name;
+#endif
+        }
+
+        template <class T>
+        constexpr std::string_view type_name = get_type_name<T>();
 
         template <std::size_t N, typename T, field_referenceable U = std::remove_cvref_t<T>>
         constexpr decltype(auto) get_field(T& t) noexcept
@@ -773,6 +824,7 @@ namespace field_reflection
     using detail::field_type;
     using detail::get_field;
     using detail::to_tuple;
+    using detail::type_name;
 
     template <typename T1, typename T2, typename Func, field_referenceable U1 = std::remove_cvref_t<T1>,
               field_referenceable U2 = std::remove_cvref_t<T2>>
