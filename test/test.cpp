@@ -196,6 +196,13 @@ TEST(field_reflection, field_name)
     static_assert(field_name<my_struct11, 1> == "y1");
 }
 
+TEST(field_reflection, type_name)
+{
+    static_assert(type_name<my_struct1> == "my_struct1");
+    static_assert(type_name<named::my_struct10> == "named::my_struct10");
+    static_assert(type_name<std::pair<int, double>> == "std::pair<int, double>");
+}
+
 TEST(field_reflection, get_field)
 {
     {
