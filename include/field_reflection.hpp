@@ -664,6 +664,7 @@ namespace field_reflection
         template <typename T>
         consteval std::string_view get_type_name()
         {
+#if defined(__GNUC__) || defined(__clang__)
             constexpr auto detector_name = get_function_name<type_name_detector>();
             constexpr auto dummy = std::string_view("T = ");
             constexpr auto dummy_begin = detector_name.find(dummy) + dummy.size();
@@ -672,6 +673,25 @@ namespace field_reflection
 
             constexpr auto type_name_raw = get_function_name<T>();
             return type_name_raw.substr(dummy_begin, type_name_raw.size() - dummy_begin - dummy_suffix_length);
+#else
+            constexpr auto detector_name = get_function_name<field_name_detector>();
+            constexpr auto dummy = std::string_view("struct field_reflection::detail::field_name_detector");
+            constexpr auto dummy_begin = detector_name.find(dummy);
+            constexpr auto dummy_suffix_length = detector_name.size() - dummy_begin - dummy.size();
+
+            auto field_name_raw = get_function_name<T>();
+            auto field_name =
+                field_name_raw.substr(dummy_begin, field_name_raw.size() - dummy_begin - dummy_suffix_length);
+            if (auto s = std::string_view("struct "); field_name.starts_with(s))
+            {
+                field_name.remove_prefix(s.size());
+            }
+            if (auto s = std::string_view("class "); field_name.starts_with(s))
+            {
+                field_name.remove_prefix(s.size());
+            }
+            return field_name;
+#endif
         }
 
         template <class T>
