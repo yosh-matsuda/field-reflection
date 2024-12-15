@@ -108,6 +108,10 @@ jobs:
               c: "$(brew --prefix llvm@18)/bin/clang",
               cxx: "$(brew --prefix llvm@18)/bin/clang++",
             },
+            {
+              c: "$(brew --prefix llvm@19)/bin/clang",
+              cxx: "$(brew --prefix llvm@19)/bin/clang++",
+            },
           ]
     name: Ubuntu - ${{ matrix.compiler.cxx }}
     runs-on: ubuntu-24.04
@@ -123,7 +127,7 @@ jobs:
       - name: Install compilers
         run: |
           eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-          brew install ninja llvm@15 llvm@16 llvm@17 llvm@18
+          brew install ninja llvm@15 llvm@16 llvm@17 llvm@18 llvm@19
 
       - name: Install dependencies
         run: vcpkg install gtest --triplet ${{ env.triplet }}
@@ -144,9 +148,9 @@ jobs:
       matrix:
         compiler:
           [
-            { c: "gcc-11", cxx: "g++-11" },
             { c: "gcc-12", cxx: "g++-12" },
-            # { c: "gcc-13", cxx: "g++-13" },
+            { c: "gcc-13", cxx: "g++-13" },
+            { c: "gcc-14", cxx: "g++-14" },
             {
               c: "$(brew --prefix llvm@16)/bin/clang",
               cxx: "$(brew --prefix llvm@16)/bin/clang++",
@@ -158,6 +162,10 @@ jobs:
             {
               c: "$(brew --prefix llvm@18)/bin/clang",
               cxx: "$(brew --prefix llvm@18)/bin/clang++",
+            },
+            {
+              c: "$(brew --prefix llvm@19)/bin/clang",
+              cxx: "$(brew --prefix llvm@19)/bin/clang++",
             },
           ]
     name: MacOS - ${{ matrix.compiler.cxx }}
@@ -172,7 +180,7 @@ jobs:
           submodules: true
 
       - name: Install compilers
-        run: brew install ninja llvm@16 llvm@17 llvm@18
+        run: brew install ninja llvm@16 llvm@17 llvm@18 llvm@19
 
       - name: Install dependencies
         run: |
