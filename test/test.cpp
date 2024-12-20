@@ -200,7 +200,11 @@ TEST(field_reflection, type_name)
 {
     static_assert(type_name<my_struct1> == "my_struct1");
     static_assert(type_name<named::my_struct10> == "named::my_struct10");
+#if defined(__GNUC__) || defined(__clang__)
     static_assert(type_name<std::pair<int, double>> == "std::pair<int, double>");
+#else
+    static_assert(type_name<std::pair<int, double>> == "std::pair<int,double>");
+#endif
 }
 
 TEST(field_reflection, get_field)
