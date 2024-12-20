@@ -139,6 +139,88 @@ constexpr auto get_field(T&& t) noexcept;
 
 Extracts the `N`-th element from the `field_referenceable` type `T` and returns a reference to it. It behaves like `std::get` for `std::tuple` but returns a lvalue value instead of a rvalue reference.
 
+### `type_name`
+
+```cpp
+template <class T>
+constexpr std::string_view type_name;
+```
+
+Get the name of the type `T`.
+
+<details>
+<summary>Example</summary>
+
+```cpp
+#include <field_reflection.hpp>
+#include <format>
+#include <type_traits>
+#include <utility> // std::exchange
+#include <variant>
+
+using Token = std::variant<struct Number, struct Identifier>;
+
+struct Number {
+  int value;
+};
+
+struct Identifier {
+  std::string name;
+};
+
+template <typename T, typename Variant>
+inline constexpr bool alternative_of = false;
+
+template <typename T, typename... Types>
+inline constexpr bool alternative_of<T, std::variant<Types...>> =
+  (std::is_same_v<T, Types> || ...);
+
+template <typename T>
+  requires alternative_of<T, Token>
+struct std::formatter<T> {
+  constexpr auto parse(auto& ctx) -> decltype(ctx.begin()) {
+    auto it = ctx.begin();
+    if (it != ctx.end() and *it != '}') {
+      throw std::format_error("invalid format");
+    }
+    return it;
+  }
+
+  auto format(const T& t, auto& ctx) const -> decltype(ctx.out()) {
+    auto out = ctx.out();
+    out = std::format_to(out, "{} {{", field_reflection::type_name<T>);
+    const char* dlm = "";
+    field_reflection::for_each_field(
+      t, [&](std::string_view name, const auto& value) {
+        std::format_to(
+          out, "{}\n  .{}={}", std::exchange(dlm, ","), name, value);
+      });
+    out = std::format_to(out, "\n}}");
+    return out;
+  }
+};
+
+#include <iostream>
+
+int main() {
+  Number num{42};
+  Identifier ident{"ident"};
+  std::cout << std::format("{}", num) << std::endl;
+  std::cout << std::format("{}", ident) << std::endl;
+  // Expected Output
+  // ===============
+  // Number {
+  //   .value=42
+  // }
+  // Identifier {
+  //   .name=ident
+  // }
+}
+```
+
+🔗[Execution example in Compiler Explorer](https://godbolt.org/z/94fPc895o)
+</details>
+
 ### `for_each_field`, `all_of_field`, `any_of_field`
 
 ```cpp
