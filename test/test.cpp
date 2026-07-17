@@ -480,9 +480,7 @@ TEST(field_reflection, for_each_field)
     for_each_field(ms5_a, ms5_b, [](auto&, auto&) {});
     for_each_field(ms5_a, ms5_b, [](std::string_view, auto&, auto&) {});
 
-    for_each_field(my_struct12{std::make_unique<int>(42)}, [](std::unique_ptr<int>&& value) {
-        EXPECT_EQ(*value, 42);
-    });
+    for_each_field(my_struct12{std::make_unique<int>(42)}, [](std::unique_ptr<int>&& value) { EXPECT_EQ(*value, 42); });
     for_each_field(my_struct12{std::make_unique<int>(42)}, [](std::string_view name, std::unique_ptr<int>&& value) {
         EXPECT_EQ(name, "value");
         EXPECT_EQ(*value, 42);
@@ -528,20 +526,16 @@ TEST(field_reflection, all_of_field)
     EXPECT_TRUE(all_of_field(ms5_a, ms5_b, [](auto&, auto&) { return true; }));
     EXPECT_TRUE(all_of_field(ms5_a, ms5_b, [](std::string_view, auto&, auto&) { return true; }));
 
-    EXPECT_TRUE(all_of_field(my_struct12{std::make_unique<int>(42)}, [](std::unique_ptr<int>&& value) {
-        return *value == 42;
-    }));
     EXPECT_TRUE(all_of_field(my_struct12{std::make_unique<int>(42)},
-                             [](std::string_view name, std::unique_ptr<int>&& value) {
-                                 return name == "value" && *value == 42;
-                             }));
+                             [](std::unique_ptr<int>&& value) { return *value == 42; }));
+    EXPECT_TRUE(all_of_field(
+        my_struct12{std::make_unique<int>(42)},
+        [](std::string_view name, std::unique_ptr<int>&& value) { return name == "value" && *value == 42; }));
+    EXPECT_TRUE(all_of_field(
+        my_struct12{std::make_unique<int>(42)}, my_struct12{std::make_unique<int>(43)},
+        [](std::unique_ptr<int>&& value1, std::unique_ptr<int>&& value2) { return *value1 == 42 && *value2 == 43; }));
     EXPECT_TRUE(all_of_field(my_struct12{std::make_unique<int>(42)}, my_struct12{std::make_unique<int>(43)},
-                             [](std::unique_ptr<int>&& value1, std::unique_ptr<int>&& value2) {
-                                 return *value1 == 42 && *value2 == 43;
-                             }));
-    EXPECT_TRUE(all_of_field(my_struct12{std::make_unique<int>(42)}, my_struct12{std::make_unique<int>(43)},
-                             [](std::string_view name, std::unique_ptr<int>&& value1,
-                                std::unique_ptr<int>&& value2) {
+                             [](std::string_view name, std::unique_ptr<int>&& value1, std::unique_ptr<int>&& value2) {
                                  return name == "value" && *value1 == 42 && *value2 == 43;
                              }));
 }
@@ -581,20 +575,16 @@ TEST(field_reflection, any_of_field)
     EXPECT_FALSE(any_of_field(ms9_a, ms9_b, [](auto&, auto&) { return false; }));
     EXPECT_FALSE(any_of_field(ms9_a, ms9_b, [](std::string_view, auto&, auto&) { return false; }));
 
-    EXPECT_TRUE(any_of_field(my_struct12{std::make_unique<int>(42)}, [](std::unique_ptr<int>&& value) {
-        return *value == 42;
-    }));
     EXPECT_TRUE(any_of_field(my_struct12{std::make_unique<int>(42)},
-                             [](std::string_view name, std::unique_ptr<int>&& value) {
-                                 return name == "value" && *value == 42;
-                             }));
+                             [](std::unique_ptr<int>&& value) { return *value == 42; }));
+    EXPECT_TRUE(any_of_field(
+        my_struct12{std::make_unique<int>(42)},
+        [](std::string_view name, std::unique_ptr<int>&& value) { return name == "value" && *value == 42; }));
+    EXPECT_TRUE(any_of_field(
+        my_struct12{std::make_unique<int>(42)}, my_struct12{std::make_unique<int>(43)},
+        [](std::unique_ptr<int>&& value1, std::unique_ptr<int>&& value2) { return *value1 == 42 && *value2 == 43; }));
     EXPECT_TRUE(any_of_field(my_struct12{std::make_unique<int>(42)}, my_struct12{std::make_unique<int>(43)},
-                             [](std::unique_ptr<int>&& value1, std::unique_ptr<int>&& value2) {
-                                 return *value1 == 42 && *value2 == 43;
-                             }));
-    EXPECT_TRUE(any_of_field(my_struct12{std::make_unique<int>(42)}, my_struct12{std::make_unique<int>(43)},
-                             [](std::string_view name, std::unique_ptr<int>&& value1,
-                                std::unique_ptr<int>&& value2) {
+                             [](std::string_view name, std::unique_ptr<int>&& value1, std::unique_ptr<int>&& value2) {
                                  return name == "value" && *value1 == 42 && *value2 == 43;
                              }));
 }
