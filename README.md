@@ -21,14 +21,31 @@ C++20 compilers are required to use this library.
 * MSVC >= 19.37
     * clang-cl >= 17
 
+## Installation
+
+This library is header-only. You can copy `include/field_reflection.hpp` into your include path, or consume the CMake target from this repository:
+
+```cmake
+add_subdirectory(field-reflection)
+target_link_libraries(your_target PRIVATE field_reflection::field_reflection)
+```
+
+If the library has been installed as a CMake package, use:
+
+```cmake
+find_package(field_reflection CONFIG REQUIRED)
+target_link_libraries(your_target PRIVATE field_reflection::field_reflection)
+```
+
 ## Usage
 
 ```cpp
 #include <array>
 #include <cstdint>
+#include <iostream>
 #include <map>
-#include <print>
 #include <string>
+#include <string_view>
 #include "field_reflection.hpp"
 
 using namespace field_reflection;
@@ -88,11 +105,21 @@ template<typename T>
 concept field_namable;
 ```
 
-The `field_countable` is a concept that checks if the type `T` is a field-countable struct. Internally, it is equivalent to that `T` is [aggregate type](https://en.cppreference.com/w/cpp/types/is_aggregate) and the number of the field is less than or equal to `100`.
+The `field_countable` is a concept that checks if the type `T` is a field-countable struct. Internally, it is equivalent to that `T` is an [aggregate type](https://en.cppreference.com/w/cpp/types/is_aggregate) and the number of fields is less than or equal to the implementation limit, which is `min(100, sizeof(T) * CHAR_BIT)`.
 
 The `field_referenceable` is a concept that checks if a field of the type `T` can be referenced by index. This includes the `field_countable` concept. The implementation of the `field_referenceable` concept is the condition that the `field_countable` type `T` has no base class.
 
 The `field_namable` is a concept that checks if a field name of the type `T` can be obtained by index statically. This includes the `field_referenceable` concept and also requires that the type `T` has a field and (practically) there is no reference type member.
+
+The concepts form the following hierarchy:
+
+| Type shape | `field_countable` | `field_referenceable` | `field_namable` |
+| --- | --- | --- | --- |
+| Aggregate with ordinary data members | yes | yes | yes |
+| Aggregate with reference data members | yes | yes | no |
+| Aggregate with a base class | yes | no | no |
+| Empty aggregate | yes | yes | no |
+| Non-aggregate type | no | no | no |
 
 ### `field_count`
 
@@ -248,7 +275,7 @@ Visits each field of the type `T` and applies the unary or binary operation `fun
 
 The `for_each_field` just applies the `func` and returns `void`, while the `all_of_field` and `any_of_field` return `bool` indicating whether all or any of the `func` returns `true`.
 
-For example, the following code prints the field names and values of the `my_struct` `s`:
+For example, the following code prints the field names of the `my_struct` `s`:
 
 ```cpp
 constexpr auto func = [](std::string_view field, auto& value) {
@@ -288,7 +315,9 @@ template <field_referenceable T>
 constexpr std::tuple<...> to_tuple(T&& t);
 ```
 
-Copy a `field_referenceable` type `T` object and convert it to `std::tuple` where each field has the same type as `T`. For example, `my_struct` object can be converted to  object of type `std::tuple<int, double, std::string, std::array<std::uint64_t, 3>, std::map<std::string, int>>`.
+Copy a `field_referenceable` type `T` object and convert it to `std::tuple`, where each tuple element has the same type as the corresponding field. For example, a `my_struct` object can be converted to an object of type `std::tuple<int, double, std::string, std::array<std::uint64_t, 3>, std::map<std::string, int>>`.
+
+When `t` is an rvalue, the tuple elements are move-constructed from the fields when possible. This allows `to_tuple` and the field visitor functions to work with move-only fields such as `std::unique_ptr`.
 
 ## Acknowledgments
 
