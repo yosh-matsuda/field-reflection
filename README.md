@@ -148,6 +148,8 @@ using field_type;
 
 Get the type of the `N`-th field from the `field_referenceable` type `T`.
 
+This operation inspects only the field type. It does not extract the field value or convert the object to a tuple, so it can be used in cases where value-based operations are not available. Examples include aggregates with non-copyable or non-movable fields, and compiler-specific packed aggregates whose fields cannot be referenced as ordinary lvalues.
+
 ### `get_field`
 
 ```cpp
@@ -165,6 +167,8 @@ constexpr auto get_field(T&& t) noexcept;
 ```
 
 Extracts the `N`-th element from the `field_referenceable` type `T`. The lvalue overloads return a reference to the field. The rvalue overload returns the selected field by value, moving it from the source object when possible.
+
+Because this operation accesses the field value, it is subject to the usual language and compiler rules for forming references or moving values from the selected field.
 
 ### `type_name`
 

@@ -154,6 +154,13 @@ namespace field_reflection
         {
             static_assert([] { return false; }(), "The supported maximum number of fields in struct must be <= 100.");
         }
+        template <field_referenceable T>
+        constexpr auto field_type_tuple()
+        {
+            static_assert([] { return false; }(), "The supported maximum number of fields in struct must be <= 100.");
+        }
+        template <typename T>
+        inline T* field_type_source = nullptr;
         template <typename T, field_referenceable U = std::remove_cvref_t<T>>
         requires (field_count<U> == 0)
         constexpr auto to_ptr_tuple(T&&)
@@ -203,22 +210,30 @@ namespace field_reflection
 #define FIELD_RFL_ADDR(x) &x
 #define FIELD_RFL_DECLTYPE(x) decltype(x)
 #define FIELD_RFL_FORWARD(x) std::forward<decltype(x)>(x)
+#define FIELD_RFL_FIELD_TYPE(x) decltype(x)
 
-#define TO_TUPLE_TEMPLATE(NUM, ...)                                             \
-    template <typename T, field_referenceable U = std::remove_cvref_t<T>>       \
-    requires (field_count<U> == NUM)                                            \
-    constexpr auto to_ptr_tuple(T&& t)                                          \
-    {                                                                           \
-        auto& [__VA_ARGS__] = t;                                                \
-        return std::tuple(FIELD_RFL_MAP_LIST(FIELD_RFL_ADDR, __VA_ARGS__));     \
-    }                                                                           \
-    template <typename T, field_referenceable U = std::remove_cvref_t<T>>       \
-    requires (field_count<U> == NUM)                                            \
-    constexpr auto to_tuple(T&& t)                                              \
-    {                                                                           \
-        auto [__VA_ARGS__] = std::forward<T>(t);                                \
-        return std::tuple<FIELD_RFL_MAP_LIST(FIELD_RFL_DECLTYPE, __VA_ARGS__)>( \
-            FIELD_RFL_MAP_LIST(FIELD_RFL_FORWARD, __VA_ARGS__));                \
+#define TO_TUPLE_TEMPLATE(NUM, ...)                                                                     \
+    template <typename T, field_referenceable U = std::remove_cvref_t<T>>                               \
+    requires (field_count<U> == NUM)                                                                    \
+    constexpr auto to_ptr_tuple(T&& t)                                                                  \
+    {                                                                                                   \
+        auto& [__VA_ARGS__] = t;                                                                        \
+        return std::tuple(FIELD_RFL_MAP_LIST(FIELD_RFL_ADDR, __VA_ARGS__));                             \
+    }                                                                                                   \
+    template <typename T, field_referenceable U = std::remove_cvref_t<T>>                               \
+    requires (field_count<U> == NUM)                                                                    \
+    constexpr auto to_tuple(T&& t)                                                                      \
+    {                                                                                                   \
+        auto [__VA_ARGS__] = std::forward<T>(t);                                                        \
+        return std::tuple<FIELD_RFL_MAP_LIST(FIELD_RFL_DECLTYPE, __VA_ARGS__)>(                         \
+            FIELD_RFL_MAP_LIST(FIELD_RFL_FORWARD, __VA_ARGS__));                                        \
+    }                                                                                                   \
+    template <field_referenceable T>                                                                    \
+    requires (field_count<T> == NUM)                                                                    \
+    constexpr auto field_type_tuple()                                                                   \
+    {                                                                                                   \
+        auto&& [__VA_ARGS__] = *field_type_source<T>;                                                   \
+        return std::type_identity<std::tuple<FIELD_RFL_MAP_LIST(FIELD_RFL_FIELD_TYPE, __VA_ARGS__)>>{}; \
     }
 
         TO_TUPLE_TEMPLATE(1, p0)
@@ -555,6 +570,9 @@ namespace field_reflection
 #undef FIELD_RFL_MAP
 #undef FIELD_RFL_MAP_LIST
 #undef FIELD_RFL_DECLTYPE
+#undef FIELD_RFL_FIELD_TYPE
+#undef FIELD_RFL_FORWARD
+#undef FIELD_RFL_ADDR
 #undef FIELD_RFL_MOVE
 #undef FIELD_RFL_TO_TUPLE_TEMPLATE
 #pragma endregion TO_TUPLE_TEMPLATE_MACRO
@@ -647,15 +665,11 @@ namespace field_reflection
             return field_name_raw.substr(begin, last - begin);
         }
 
-        template <typename T>
-        using remove_rvalue_reference_t =
-            std::conditional_t<std::is_rvalue_reference_v<T>, std::remove_reference_t<T>, T>;
-
         template <field_namable T, std::size_t N>
         constexpr std::string_view field_name = get_field_name<T, get_ptr<T, N>()>();
 
         template <field_referenceable T, std::size_t N>
-        using field_type = remove_rvalue_reference_t<decltype(std::get<N>(to_tuple(std::declval<T&>())))>;
+        using field_type = std::tuple_element_t<N, typename decltype(field_type_tuple<T>())::type>;
 
         struct type_name_detector
         {

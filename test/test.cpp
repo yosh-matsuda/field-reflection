@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include <array>
+#include <cstdint>
 #include <map>
 #include <memory>
 #include <optional>
@@ -104,6 +105,41 @@ struct my_struct12
     std::unique_ptr<int> value;
 };
 
+struct my_struct13
+{
+    const int value;
+};
+
+struct my_struct14
+{
+    struct non_movable
+    {
+        non_movable() = default;
+        non_movable(const non_movable&) = delete;
+        non_movable(non_movable&&) = delete;
+    } value;
+};
+
+#if defined(__GNUC__) || defined(__clang__)
+struct packed_other_elements
+{
+    uint8_t elementa;
+    uint8_t elemento;
+} __attribute__((__packed__));
+
+struct packed_element_size
+{
+    packed_other_elements chif;
+    uint64_t element;
+    uint32_t element3;
+} __attribute__((__packed__));
+
+struct packed_const_element
+{
+    const uint8_t value;
+} __attribute__((__packed__));
+#endif
+
 TEST(field_reflection, concept)
 {
     static_assert(field_countable<my_struct1>);
@@ -118,6 +154,12 @@ TEST(field_reflection, concept)
     static_assert(field_countable<named::my_struct10>);
     static_assert(field_countable<my_struct11>);
     static_assert(field_countable<my_struct12>);
+    static_assert(field_countable<my_struct13>);
+    static_assert(field_countable<my_struct14>);
+#if defined(__GNUC__) || defined(__clang__)
+    static_assert(field_countable<packed_element_size>);
+    static_assert(field_countable<packed_const_element>);
+#endif
 
     static_assert(field_referenceable<my_struct1>);
     static_assert(field_referenceable<my_struct2>);
@@ -131,6 +173,12 @@ TEST(field_reflection, concept)
     static_assert(field_referenceable<named::my_struct10>);
     static_assert(field_referenceable<my_struct11>);
     static_assert(field_referenceable<my_struct12>);
+    static_assert(field_referenceable<my_struct13>);
+    static_assert(field_referenceable<my_struct14>);
+#if defined(__GNUC__) || defined(__clang__)
+    static_assert(field_referenceable<packed_element_size>);
+    static_assert(field_referenceable<packed_const_element>);
+#endif
 
     static_assert(field_namable<my_struct1>);
     static_assert(!field_namable<my_struct2>);
@@ -144,6 +192,12 @@ TEST(field_reflection, concept)
     static_assert(field_namable<named::my_struct10>);
     static_assert(field_namable<my_struct11>);
     static_assert(field_namable<my_struct12>);
+    static_assert(field_namable<my_struct13>);
+    static_assert(field_namable<my_struct14>);
+#if defined(__GNUC__) || defined(__clang__)
+    static_assert(field_namable<packed_element_size>);
+    static_assert(field_namable<packed_const_element>);
+#endif
 }
 
 TEST(field_reflection, field_count)
@@ -159,6 +213,12 @@ TEST(field_reflection, field_count)
     static_assert(field_count<named::my_struct10> == 2);
     static_assert(field_count<my_struct11> == 2);
     static_assert(field_count<my_struct12> == 1);
+    static_assert(field_count<my_struct13> == 1);
+    static_assert(field_count<my_struct14> == 1);
+#if defined(__GNUC__) || defined(__clang__)
+    static_assert(field_count<packed_element_size> == 3);
+    static_assert(field_count<packed_const_element> == 1);
+#endif
 }
 
 TEST(field_reflection, field_type)
@@ -185,6 +245,17 @@ TEST(field_reflection, field_type)
 
     static_assert(std::is_same_v<field_type<my_struct11, 0>, decltype(std::declval<my_struct11>().x1)>);
     static_assert(std::is_same_v<field_type<my_struct11, 1>, decltype(std::declval<my_struct11>().y1)>);
+
+    static_assert(std::is_same_v<field_type<my_struct12, 0>, decltype(std::declval<my_struct12>().value)>);
+    static_assert(std::is_same_v<field_type<my_struct13, 0>, decltype(std::declval<my_struct13>().value)>);
+    static_assert(std::is_same_v<field_type<my_struct14, 0>, decltype(std::declval<my_struct14>().value)>);
+
+#if defined(__GNUC__) || defined(__clang__)
+    static_assert(std::is_same_v<field_type<packed_element_size, 0>, packed_other_elements>);
+    static_assert(std::is_same_v<field_type<packed_element_size, 1>, uint64_t>);
+    static_assert(std::is_same_v<field_type<packed_element_size, 2>, uint32_t>);
+    static_assert(std::is_same_v<field_type<packed_const_element, 0>, const uint8_t>);
+#endif
 }
 
 TEST(field_reflection, field_name)
@@ -205,6 +276,14 @@ TEST(field_reflection, field_name)
     static_assert(field_name<my_struct11, 0> == "x1");
     static_assert(field_name<my_struct11, 1> == "y1");
     static_assert(field_name<my_struct12, 0> == "value");
+    static_assert(field_name<my_struct13, 0> == "value");
+    static_assert(field_name<my_struct14, 0> == "value");
+#if defined(__GNUC__) || defined(__clang__)
+    static_assert(field_name<packed_element_size, 0> == "chif");
+    static_assert(field_name<packed_element_size, 1> == "element");
+    static_assert(field_name<packed_element_size, 2> == "element3");
+    static_assert(field_name<packed_const_element, 0> == "value");
+#endif
 }
 
 TEST(field_reflection, type_name)
