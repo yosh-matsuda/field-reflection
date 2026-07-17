@@ -1,8 +1,8 @@
 /*===================================================*
-|  field-reflection version v0.2.1                   |
+|  field-reflection version v0.3.0                   |
 |  https://github.com/yosh-matsuda/field-reflection  |
 |                                                    |
-|  Copyright (c) 2024 Yoshiki Matsuda @yosh-matsuda  |
+|  Copyright (c) 2026 Yoshiki Matsuda @yosh-matsuda  |
 |                                                    |
 |  This software is released under the MIT License.  |
 |  https://opensource.org/license/mit/               |
@@ -771,8 +771,10 @@ namespace field_reflection
                 (func(get_stored_field<Is>(storage1), get_stored_field<Is>(storage2)), ...);
             }
             else if constexpr (requires {
-                         (func(field_name<U, Is>, get_stored_field<Is>(storage1), get_stored_field<Is>(storage2)), ...);
-                     })
+                                   (func(field_name<U, Is>, get_stored_field<Is>(storage1),
+                                         get_stored_field<Is>(storage2)),
+                                    ...);
+                               })
             {
                 (func(field_name<U, Is>, get_stored_field<Is>(storage1), get_stored_field<Is>(storage2)), ...);
             }
@@ -811,8 +813,10 @@ namespace field_reflection
                 return (func(get_stored_field<Is>(storage1), get_stored_field<Is>(storage2)) && ...);
             }
             else if constexpr (requires {
-                         (func(field_name<U, Is>, get_stored_field<Is>(storage1), get_stored_field<Is>(storage2)) && ...);
-                     })
+                                   (func(field_name<U, Is>, get_stored_field<Is>(storage1),
+                                         get_stored_field<Is>(storage2)) &&
+                                    ...);
+                               })
             {
                 return (func(field_name<U, Is>, get_stored_field<Is>(storage1), get_stored_field<Is>(storage2)) && ...);
             }
@@ -851,8 +855,10 @@ namespace field_reflection
                 return (func(get_stored_field<Is>(storage1), get_stored_field<Is>(storage2)) || ...);
             }
             else if constexpr (requires {
-                         (func(field_name<U, Is>, get_stored_field<Is>(storage1), get_stored_field<Is>(storage2)) || ...);
-                     })
+                                   (func(field_name<U, Is>, get_stored_field<Is>(storage1),
+                                         get_stored_field<Is>(storage2)) ||
+                                    ...);
+                               })
             {
                 return (func(field_name<U, Is>, get_stored_field<Is>(storage1), get_stored_field<Is>(storage2)) || ...);
             }
