@@ -710,16 +710,49 @@ namespace field_reflection
             return std::get<N>(to_tuple(std::forward<T>(t)));
         }
 
+        template <typename Tuple, bool Move>
+        struct field_storage
+        {
+            Tuple fields;
+        };
+
+        template <typename T>
+        constexpr auto make_field_storage(T&& t)
+        {
+            if constexpr (std::is_rvalue_reference_v<T&&>)
+            {
+                return field_storage<decltype(to_tuple(std::forward<T>(t))), true>{to_tuple(std::forward<T>(t))};
+            }
+            else
+            {
+                return field_storage<decltype(to_ptr_tuple(t)), false>{to_ptr_tuple(t)};
+            }
+        }
+
+        template <std::size_t N, typename Tuple, bool Move>
+        constexpr decltype(auto) get_stored_field(field_storage<Tuple, Move>& storage) noexcept
+        {
+            if constexpr (Move)
+            {
+                return std::get<N>(std::move(storage.fields));
+            }
+            else
+            {
+                return *std::get<N>(storage.fields);
+            }
+        }
+
         template <typename T, typename Func, std::size_t... Is, field_referenceable U = std::remove_cvref_t<T>>
         void for_each_field_impl(T&& t, Func&& func, std::index_sequence<Is...>)
         {
-            if constexpr (requires { (func(get_field<Is>(t)), ...); })
+            auto storage = make_field_storage(std::forward<T>(t));
+            if constexpr (requires { (func(get_stored_field<Is>(storage)), ...); })
             {
-                (func(get_field<Is>(t)), ...);
+                (func(get_stored_field<Is>(storage)), ...);
             }
-            else if constexpr (requires { (func(field_name<U, Is>, get_field<Is>(t)), ...); })
+            else if constexpr (requires { (func(field_name<U, Is>, get_stored_field<Is>(storage)), ...); })
             {
-                (func(field_name<U, Is>, get_field<Is>(t)), ...);
+                (func(field_name<U, Is>, get_stored_field<Is>(storage)), ...);
             }
             else
             {
@@ -731,13 +764,17 @@ namespace field_reflection
                   field_referenceable U = std::remove_cvref_t<T1>>
         void for_each_field_impl(T1&& t1, T2&& t2, Func&& func, std::index_sequence<Is...>)
         {
-            if constexpr (requires { (func(get_field<Is>(t1), get_field<Is>(t2)), ...); })
+            auto storage1 = make_field_storage(std::forward<T1>(t1));
+            auto storage2 = make_field_storage(std::forward<T2>(t2));
+            if constexpr (requires { (func(get_stored_field<Is>(storage1), get_stored_field<Is>(storage2)), ...); })
             {
-                (func(get_field<Is>(t1), get_field<Is>(t2)), ...);
+                (func(get_stored_field<Is>(storage1), get_stored_field<Is>(storage2)), ...);
             }
-            else if constexpr (requires { (func(field_name<U, Is>, get_field<Is>(t1), get_field<Is>(t2)), ...); })
+            else if constexpr (requires {
+                         (func(field_name<U, Is>, get_stored_field<Is>(storage1), get_stored_field<Is>(storage2)), ...);
+                     })
             {
-                (func(field_name<U, Is>, get_field<Is>(t1), get_field<Is>(t2)), ...);
+                (func(field_name<U, Is>, get_stored_field<Is>(storage1), get_stored_field<Is>(storage2)), ...);
             }
             else
             {
@@ -748,13 +785,14 @@ namespace field_reflection
         template <typename T, typename Func, std::size_t... Is, field_referenceable U = std::remove_cvref_t<T>>
         bool all_of_field_impl(T&& t, Func&& func, std::index_sequence<Is...>)
         {
-            if constexpr (requires { (func(get_field<Is>(t)) && ...); })
+            auto storage = make_field_storage(std::forward<T>(t));
+            if constexpr (requires { (func(get_stored_field<Is>(storage)) && ...); })
             {
-                return (func(get_field<Is>(t)) && ...);
+                return (func(get_stored_field<Is>(storage)) && ...);
             }
-            else if constexpr (requires { (func(field_name<U, Is>, get_field<Is>(t)) && ...); })
+            else if constexpr (requires { (func(field_name<U, Is>, get_stored_field<Is>(storage)) && ...); })
             {
-                return (func(field_name<U, Is>, get_field<Is>(t)) && ...);
+                return (func(field_name<U, Is>, get_stored_field<Is>(storage)) && ...);
             }
             else
             {
@@ -766,13 +804,17 @@ namespace field_reflection
                   field_referenceable U = std::remove_cvref_t<T1>>
         bool all_of_field_impl(T1&& t1, T2&& t2, Func&& func, std::index_sequence<Is...>)
         {
-            if constexpr (requires { (func(get_field<Is>(t1), get_field<Is>(t2)) && ...); })
+            auto storage1 = make_field_storage(std::forward<T1>(t1));
+            auto storage2 = make_field_storage(std::forward<T2>(t2));
+            if constexpr (requires { (func(get_stored_field<Is>(storage1), get_stored_field<Is>(storage2)) && ...); })
             {
-                return (func(get_field<Is>(t1), get_field<Is>(t2)) && ...);
+                return (func(get_stored_field<Is>(storage1), get_stored_field<Is>(storage2)) && ...);
             }
-            else if constexpr (requires { (func(field_name<U, Is>, get_field<Is>(t1), get_field<Is>(t2)) && ...); })
+            else if constexpr (requires {
+                         (func(field_name<U, Is>, get_stored_field<Is>(storage1), get_stored_field<Is>(storage2)) && ...);
+                     })
             {
-                return (func(field_name<U, Is>, get_field<Is>(t1), get_field<Is>(t2)) && ...);
+                return (func(field_name<U, Is>, get_stored_field<Is>(storage1), get_stored_field<Is>(storage2)) && ...);
             }
             else
             {
@@ -783,13 +825,14 @@ namespace field_reflection
         template <typename T, typename Func, std::size_t... Is, field_referenceable U = std::remove_cvref_t<T>>
         bool any_of_field_impl(T&& t, Func&& func, std::index_sequence<Is...>)
         {
-            if constexpr (requires { (func(get_field<Is>(t)) || ...); })
+            auto storage = make_field_storage(std::forward<T>(t));
+            if constexpr (requires { (func(get_stored_field<Is>(storage)) || ...); })
             {
-                return (func(get_field<Is>(t)) || ...);
+                return (func(get_stored_field<Is>(storage)) || ...);
             }
-            else if constexpr (requires { (func(field_name<U, Is>, get_field<Is>(t)) || ...); })
+            else if constexpr (requires { (func(field_name<U, Is>, get_stored_field<Is>(storage)) || ...); })
             {
-                return (func(field_name<U, Is>, get_field<Is>(t)) || ...);
+                return (func(field_name<U, Is>, get_stored_field<Is>(storage)) || ...);
             }
             else
             {
@@ -801,13 +844,17 @@ namespace field_reflection
                   field_referenceable U = std::remove_cvref_t<T1>>
         bool any_of_field_impl(T1&& t1, T2&& t2, Func&& func, std::index_sequence<Is...>)
         {
-            if constexpr (requires { (func(get_field<Is>(t1), get_field<Is>(t2)) || ...); })
+            auto storage1 = make_field_storage(std::forward<T1>(t1));
+            auto storage2 = make_field_storage(std::forward<T2>(t2));
+            if constexpr (requires { (func(get_stored_field<Is>(storage1), get_stored_field<Is>(storage2)) || ...); })
             {
-                return (func(get_field<Is>(t1), get_field<Is>(t2)) || ...);
+                return (func(get_stored_field<Is>(storage1), get_stored_field<Is>(storage2)) || ...);
             }
-            else if constexpr (requires { (func(field_name<U, Is>, get_field<Is>(t1), get_field<Is>(t2)) || ...); })
+            else if constexpr (requires {
+                         (func(field_name<U, Is>, get_stored_field<Is>(storage1), get_stored_field<Is>(storage2)) || ...);
+                     })
             {
-                return (func(field_name<U, Is>, get_field<Is>(t1), get_field<Is>(t2)) || ...);
+                return (func(field_name<U, Is>, get_stored_field<Is>(storage1), get_stored_field<Is>(storage2)) || ...);
             }
             else
             {

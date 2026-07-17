@@ -137,7 +137,7 @@ template <std::size_t N, field_referenceable T>
 constexpr auto get_field(T&& t) noexcept;
 ```
 
-Extracts the `N`-th element from the `field_referenceable` type `T` and returns a reference to it. It behaves like `std::get` for `std::tuple` but returns a lvalue value instead of a rvalue reference.
+Extracts the `N`-th element from the `field_referenceable` type `T`. The lvalue overloads return a reference to the field. The rvalue overload returns the selected field by value, moving it from the source object when possible.
 
 ### `type_name`
 
