@@ -5,10 +5,19 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <variant>
 #include "field_reflection.hpp"
 
 // NOLINTBEGIN
 using namespace field_reflection;
+
+template <typename, typename>
+concept test_castable = true;
+
+template <field_referenceable T>
+constexpr bool all_field_types_are_test_castable = []<std::size_t... Is>(std::index_sequence<Is...>) {
+    return (test_castable<int, field_type<T, Is>> && ...);
+}(std::make_index_sequence<field_count<T>>{});
 
 struct my_struct1
 {
@@ -120,6 +129,10 @@ struct my_struct14
     } value;
 };
 
+struct my_struct15
+{
+};
+
 #if defined(__GNUC__) || defined(__clang__)
 struct packed_other_elements
 {
@@ -156,6 +169,8 @@ TEST(field_reflection, concept)
     static_assert(field_countable<my_struct12>);
     static_assert(field_countable<my_struct13>);
     static_assert(field_countable<my_struct14>);
+    static_assert(field_countable<my_struct15>);
+    static_assert(field_countable<std::monostate>);
 #if defined(__GNUC__) || defined(__clang__)
     static_assert(field_countable<packed_element_size>);
     static_assert(field_countable<packed_const_element>);
@@ -175,6 +190,8 @@ TEST(field_reflection, concept)
     static_assert(field_referenceable<my_struct12>);
     static_assert(field_referenceable<my_struct13>);
     static_assert(field_referenceable<my_struct14>);
+    static_assert(field_referenceable<my_struct15>);
+    static_assert(field_referenceable<std::monostate>);
 #if defined(__GNUC__) || defined(__clang__)
     static_assert(field_referenceable<packed_element_size>);
     static_assert(field_referenceable<packed_const_element>);
@@ -194,6 +211,8 @@ TEST(field_reflection, concept)
     static_assert(field_namable<my_struct12>);
     static_assert(field_namable<my_struct13>);
     static_assert(field_namable<my_struct14>);
+    static_assert(!field_namable<my_struct15>);
+    static_assert(!field_namable<std::monostate>);
 #if defined(__GNUC__) || defined(__clang__)
     static_assert(field_namable<packed_element_size>);
     static_assert(field_namable<packed_const_element>);
@@ -215,6 +234,8 @@ TEST(field_reflection, field_count)
     static_assert(field_count<my_struct12> == 1);
     static_assert(field_count<my_struct13> == 1);
     static_assert(field_count<my_struct14> == 1);
+    static_assert(field_count<my_struct15> == 0);
+    static_assert(field_count<std::monostate> == 0);
 #if defined(__GNUC__) || defined(__clang__)
     static_assert(field_count<packed_element_size> == 3);
     static_assert(field_count<packed_const_element> == 1);
@@ -249,6 +270,9 @@ TEST(field_reflection, field_type)
     static_assert(std::is_same_v<field_type<my_struct12, 0>, decltype(std::declval<my_struct12>().value)>);
     static_assert(std::is_same_v<field_type<my_struct13, 0>, decltype(std::declval<my_struct13>().value)>);
     static_assert(std::is_same_v<field_type<my_struct14, 0>, decltype(std::declval<my_struct14>().value)>);
+
+    static_assert(all_field_types_are_test_castable<my_struct15>);
+    static_assert(all_field_types_are_test_castable<std::monostate>);
 
 #if defined(__GNUC__) || defined(__clang__)
     static_assert(std::is_same_v<field_type<packed_element_size, 0>, packed_other_elements>);

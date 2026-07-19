@@ -173,6 +173,12 @@ namespace field_reflection
         {
             return std::tie();
         }
+        template <field_referenceable T>
+        requires (field_count<T> == 0)
+        constexpr auto field_type_tuple()
+        {
+            return std::type_identity<std::tuple<>>{};
+        }
 
 #pragma region TO_TUPLE_TEMPLATE_MACRO
 // map macro: https://github.com/swansontec/map-macro
