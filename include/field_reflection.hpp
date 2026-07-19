@@ -779,7 +779,8 @@ namespace field_reflection
             }
             else
             {
-                static_assert(always_false<std::remove_cvref_t<Func>>, "invalid function object for call to for_each_field");
+                static_assert(always_false<std::remove_cvref_t<Func>>,
+                              "invalid function object for call to for_each_field");
             }
         }
 
@@ -803,7 +804,8 @@ namespace field_reflection
             }
             else
             {
-                static_assert(always_false<std::remove_cvref_t<Func>>, "invalid function object for call to for_each_field");
+                static_assert(always_false<std::remove_cvref_t<Func>>,
+                              "invalid function object for call to for_each_field");
             }
         }
 
@@ -821,7 +823,8 @@ namespace field_reflection
             }
             else
             {
-                static_assert(always_false<std::remove_cvref_t<Func>>, "invalid function object for call to all_of_field");
+                static_assert(always_false<std::remove_cvref_t<Func>>,
+                              "invalid function object for call to all_of_field");
             }
         }
 
@@ -845,7 +848,8 @@ namespace field_reflection
             }
             else
             {
-                static_assert(always_false<std::remove_cvref_t<Func>>, "invalid function object for call to all_of_field");
+                static_assert(always_false<std::remove_cvref_t<Func>>,
+                              "invalid function object for call to all_of_field");
             }
         }
 
@@ -863,7 +867,8 @@ namespace field_reflection
             }
             else
             {
-                static_assert(always_false<std::remove_cvref_t<Func>>, "invalid function object for call to any_of_field");
+                static_assert(always_false<std::remove_cvref_t<Func>>,
+                              "invalid function object for call to any_of_field");
             }
         }
 
@@ -887,7 +892,8 @@ namespace field_reflection
             }
             else
             {
-                static_assert(always_false<std::remove_cvref_t<Func>>, "invalid function object for call to any_of_field");
+                static_assert(always_false<std::remove_cvref_t<Func>>,
+                              "invalid function object for call to any_of_field");
             }
         }
     }  // namespace detail
