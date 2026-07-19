@@ -149,15 +149,18 @@ namespace field_reflection
         template <typename T>
         concept field_referenceable = field_countable<T> && (!has_base<T>);
 
+        template <typename>
+        constexpr bool always_false = false;
+
         template <typename T, field_referenceable U = std::remove_cvref_t<T>>
         constexpr auto to_ptr_tuple(T&&)
         {
-            static_assert([] { return false; }(), "The supported maximum number of fields in struct must be <= 100.");
+            static_assert(always_false<U>, "The supported maximum number of fields in struct must be <= 100.");
         }
         template <field_referenceable T>
         constexpr auto field_type_tuple()
         {
-            static_assert([] { return false; }(), "The supported maximum number of fields in struct must be <= 100.");
+            static_assert(always_false<T>, "The supported maximum number of fields in struct must be <= 100.");
         }
         template <typename T>
         inline T* field_type_source = nullptr;
@@ -776,7 +779,7 @@ namespace field_reflection
             }
             else
             {
-                static_assert([] { return false; }(), "invalid function object for call to for_each_field");
+                static_assert(always_false<std::remove_cvref_t<Func>>, "invalid function object for call to for_each_field");
             }
         }
 
@@ -800,7 +803,7 @@ namespace field_reflection
             }
             else
             {
-                static_assert([] { return false; }(), "invalid function object for call to for_each_field");
+                static_assert(always_false<std::remove_cvref_t<Func>>, "invalid function object for call to for_each_field");
             }
         }
 
@@ -818,7 +821,7 @@ namespace field_reflection
             }
             else
             {
-                static_assert([] { return false; }(), "invalid function object for call to all_of_field");
+                static_assert(always_false<std::remove_cvref_t<Func>>, "invalid function object for call to all_of_field");
             }
         }
 
@@ -842,7 +845,7 @@ namespace field_reflection
             }
             else
             {
-                static_assert([] { return false; }(), "invalid function object for call to all_of_field");
+                static_assert(always_false<std::remove_cvref_t<Func>>, "invalid function object for call to all_of_field");
             }
         }
 
@@ -860,7 +863,7 @@ namespace field_reflection
             }
             else
             {
-                static_assert([] { return false; }(), "invalid function object for call to any_of_field");
+                static_assert(always_false<std::remove_cvref_t<Func>>, "invalid function object for call to any_of_field");
             }
         }
 
@@ -884,7 +887,7 @@ namespace field_reflection
             }
             else
             {
-                static_assert([] { return false; }(), "invalid function object for call to any_of_field");
+                static_assert(always_false<std::remove_cvref_t<Func>>, "invalid function object for call to any_of_field");
             }
         }
     }  // namespace detail
