@@ -166,7 +166,7 @@ include(FetchContent)
 FetchContent_Declare(
   field_reflection
   GIT_REPOSITORY https://github.com/yosh-matsuda/field-reflection.git
-  GIT_TAG v0.4.0)
+  GIT_TAG v1.0.0)
 FetchContent_MakeAvailable(field_reflection)
 target_link_libraries(your_target PRIVATE field_reflection::field_reflection)
 
