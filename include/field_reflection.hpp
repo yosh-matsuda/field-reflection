@@ -49,8 +49,8 @@
 
 namespace field_reflection
 {
-    // Options to extend the set of reflectable types and members (effective only with the C++26 backend).
-    // In the C++20 backend, any non-default option makes the concepts unsatisfied.
+    // Options to extend the set of reflectable types and members. The C++20 backend ignores them and gives the same
+    // results as with the default options.
     struct reflect_options
     {
         bool non_aggregate = false;  // allow non-aggregate classes
@@ -171,14 +171,15 @@ namespace field_reflection
             template <typename E>
             constexpr bool enum_less(E lhs, E rhs) noexcept
             {
-                return to_underlying(lhs) < to_underlying(rhs);
+                // qualified so that argument-dependent lookup does not find std::to_underlying
+                return detail::to_underlying(lhs) < detail::to_underlying(rhs);
             }
         }  // namespace detail
 
 #if !FIELD_RFL_STD_REFLECTION
         namespace detail
         {
-#if defined(__GNUC__) || defined(__clang__)
+#if defined(__clang__)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wundefined-inline"
 #endif
@@ -187,10 +188,10 @@ namespace field_reflection
             {
                 template <typename U>
                 requires (!std::same_as<U, T>)
-                constexpr operator U&() const&& noexcept;  // NOLINT
+                operator U&() const&& noexcept;  // NOLINT
                 template <typename U>
                 requires (!std::same_as<U, T>)
-                constexpr operator U&() const& noexcept;  // NOLINT
+                operator U&() const& noexcept;  // NOLINT
             };
 
             template <typename T, std::size_t = 0>
@@ -198,7 +199,7 @@ namespace field_reflection
             {
                 template <typename U>
                 requires (!std::same_as<U, T>)
-                constexpr operator U() const&& noexcept;  // NOLINT
+                operator U() const&& noexcept;  // NOLINT
             };
 
             template <typename T, std::size_t = 0>
@@ -206,10 +207,10 @@ namespace field_reflection
             {
                 template <typename U>
                 requires (!std::is_base_of_v<U, T> && !std::same_as<U, T>)
-                constexpr operator U&() const&& noexcept;  // NOLINT
+                operator U&() const&& noexcept;  // NOLINT
                 template <typename U>
                 requires (!std::is_base_of_v<U, T> && !std::same_as<U, T>)
-                constexpr operator U&() const& noexcept;  // NOLINT
+                operator U&() const& noexcept;  // NOLINT
             };
 
             template <typename T, std::size_t = 0>
@@ -217,26 +218,7 @@ namespace field_reflection
             {
                 template <typename U>
                 requires (!std::is_base_of_v<U, T> && !std::same_as<U, T>)
-                constexpr operator U() const&& noexcept;  // NOLINT
-            };
-
-            template <typename T, std::size_t = 0>
-            struct any_lref_base
-            {
-                template <typename U>
-                requires std::is_base_of_v<U, T>
-                constexpr operator U&() const&& noexcept;  // NOLINT
-                template <typename U>
-                requires std::is_base_of_v<U, T>
-                constexpr operator U&() const& noexcept;  // NOLINT
-            };
-
-            template <typename T, std::size_t = 0>
-            struct any_rref_base
-            {
-                template <typename U>
-                requires std::is_base_of_v<U, T>
-                constexpr operator U() const&& noexcept;  // NOLINT
+                operator U() const&& noexcept;  // NOLINT
             };
 
             // Whether U is the type of an anonymous union or struct member of T, judged by the name of U.
@@ -251,8 +233,10 @@ namespace field_reflection
                     std::array{std::string_view("::(anonymous union at "), std::string_view("::(anonymous struct at ")};
 #else
                 // "T::<unnamed union>". A named member of an unnamed class has the type of the same name, but the
-                // copy constructor of the type of an anonymous member is inaccessible.
-                if constexpr (!std::is_trivially_copyable_v<U> || std::is_copy_constructible_v<U>)
+                // copy constructor of the type of an anonymous member is inaccessible, except in a class template
+                // specialization, whose name contains '<'.
+                if constexpr (detail_common::get_type_name<T>().find('<') == std::string_view::npos &&
+                              (!std::is_trivially_copyable_v<U> || std::is_copy_constructible_v<U>))
                 {
                     return false;
                 }
@@ -288,9 +272,9 @@ namespace field_reflection
             {
                 template <typename U>
                 requires anonymous_member_type_of<U, T>
-                constexpr operator U() const&& noexcept;  // NOLINT
+                operator U() const&& noexcept;  // NOLINT
             };
-#if defined(__GNUC__) || defined(__clang__)
+#if defined(__clang__)
 #pragma GCC diagnostic pop
 #endif
 
@@ -307,15 +291,49 @@ namespace field_reflection
                                         }
                                     }(std::make_index_sequence<ArgNum>());
 
+            // Neither copyable nor movable, so that a member constructible from any copyable type (e.g., std::any)
+            // does not accept it.
+            struct non_copyable
+            {
+                non_copyable() = default;
+                non_copyable(const non_copyable&) = delete;
+                non_copyable(non_copyable&&) = delete;
+            };
+
+            template <typename T>
+            struct lref_base_probe : non_copyable
+            {
+                template <typename U>
+                requires std::is_base_of_v<U, T> && (!std::same_as<U, T>)
+                operator U&() const&& noexcept;  // NOLINT
+                template <typename U>
+                requires std::is_base_of_v<U, T> && (!std::same_as<U, T>)
+                operator U&() const& noexcept;  // NOLINT
+            };
+
+            template <typename T>
+            struct rref_base_probe : non_copyable
+            {
+                template <typename U>
+                requires std::is_base_of_v<U, T> && (!std::same_as<U, T>)
+                operator U() const&& noexcept;  // NOLINT
+            };
+
+            // The first initializer of an aggregate initializes the first base class if any. If the first member
+            // is constructible from anything, whether T has a base class is not known, and it is assumed not.
             template <typename T>
             concept has_base = []() {
-                if constexpr (std::is_copy_constructible_v<T>)
+                if constexpr (requires { T{non_copyable{}}; })
                 {
-                    return requires { T{std::declval<any_lref_base<T>>()}; };
+                    return false;
+                }
+                else if constexpr (std::is_copy_constructible_v<T>)
+                {
+                    return requires { T{lref_base_probe<T>{}}; };
                 }
                 else
                 {
-                    return requires { T{std::declval<any_rref_base<T>>()}; };
+                    return requires { T{rref_base_probe<T>{}}; };
                 }
             }();
 
@@ -327,13 +345,13 @@ namespace field_reflection
             template <typename T, std::size_t N>
             requires std::is_aggregate_v<T>
             constexpr std::size_t field_count_impl = []() {
-                if constexpr (N >= max_field_count<T>)
-                {
-                    return std::numeric_limits<std::size_t>::max();
-                }
-                else if constexpr (constructible<T, N> && !constructible<T, N + 1>)
+                if constexpr (constructible<T, N> && !constructible<T, N + 1>)
                 {
                     return N;
+                }
+                else if constexpr (N >= max_field_count<T>)
+                {
+                    return std::numeric_limits<std::size_t>::max();
                 }
                 else
                 {
@@ -531,7 +549,9 @@ namespace field_reflection
                 return std::tie();
             }
 
+#if defined(_MSC_VER)
 #pragma region TO_TUPLE_TEMPLATE_MACRO
+#endif
 // map macro: https://github.com/swansontec/map-macro
 #define FIELD_RFL_EVAL0(...) __VA_ARGS__
 #define FIELD_RFL_EVAL1(...) FIELD_RFL_EVAL0(FIELD_RFL_EVAL0(FIELD_RFL_EVAL0(__VA_ARGS__)))
@@ -962,7 +982,9 @@ namespace field_reflection
 #undef FIELD_RFL_NO_BIT_FIELDS
 #undef FIELD_RFL_MOVE
 #undef TO_TUPLE_TEMPLATE
+#if defined(_MSC_VER)
 #pragma endregion TO_TUPLE_TEMPLATE_MACRO
+#endif
 
 #if defined(__clang__)
 #pragma clang diagnostic push
@@ -1133,9 +1155,11 @@ namespace field_reflection
                 detector_value
             };
 
+            // Non-ASCII characters in an identifier are encoded in UTF-8, whose bytes are 0x80 or more.
             constexpr bool is_identifier_char(char c) noexcept
             {
-                return c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9');
+                return c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
+                       static_cast<unsigned char>(c) >= 0x80;
             }
 
             // Returns the enumerator name of the value V of E, or an empty string if it has no name.
@@ -1181,10 +1205,15 @@ namespace field_reflection
                 }
             }();
 
+            // A variable template evaluates each name in a separate constant evaluation, whose number of steps is
+            // limited by the compiler.
+            template <typename E, long long V>
+            constexpr std::string_view enum_name_of_value = get_enum_name<E, V>();
+
             template <typename E, long long... Is>
             consteval auto get_enum_names_in_range(std::integer_sequence<long long, Is...>)
             {
-                return std::array<std::string_view, sizeof...(Is)>{get_enum_name<E, enum_range_min<E> + Is>()...};
+                return std::array<std::string_view, sizeof...(Is)>{enum_name_of_value<E, enum_range_min<E> + Is>...};
             }
 
             template <typename E>
@@ -1419,25 +1448,23 @@ namespace field_reflection
             }
 
             template <typename T>
-            constexpr bool has_bit_field_v = has_bit_field<T>();
+            constexpr bool has_bit_field_v = has_bit_field<std::remove_cv_t<T>>();
 
             template <typename T>
             consteval bool has_unique_names()
             {
-                const auto members = members_of_v<T>;
-                for (std::size_t i = 0; i < members.size(); ++i)
+                std::vector<std::string_view> names;
+                for (auto member : members_of_v<T>)
                 {
-                    if (!meta::has_identifier(members[i])) return false;
-                    for (std::size_t j = 0; j < i; ++j)
-                    {
-                        if (meta::identifier_of(members[i]) == meta::identifier_of(members[j])) return false;
-                    }
+                    if (!meta::has_identifier(member)) return false;
+                    names.push_back(meta::identifier_of(member));
                 }
-                return true;
+                std::sort(names.begin(), names.end());
+                return std::adjacent_find(names.begin(), names.end()) == names.end();
             }
 
             template <typename T>
-            constexpr bool has_unique_names_v = has_unique_names<T>();
+            constexpr bool has_unique_names_v = has_unique_names<std::remove_cv_t<T>>();
 
             template <typename U, std::size_t N, typename T>
             constexpr decltype(auto) get_member(T& t) noexcept
@@ -1514,11 +1541,13 @@ namespace field_reflection
                 const char* name;
             };
 
-            // All enumerators in declaration order, including aliases
+            // All enumerators in declaration order, including aliases. An enumeration declared by an opaque
+            // declaration, e.g., `enum class E : int;`, has no enumerators.
             template <typename E>
             consteval std::span<const enum_entry<E>> get_all_enum_entries()
             {
                 std::vector<enum_entry<E>> entries;
+                if (!meta::is_enumerable_type(^^E)) return {};
                 for (auto e : meta::enumerators_of(^^E))
                 {
                     entries.push_back({meta::extract<E>(e), std::define_static_string(meta::identifier_of(e))});
@@ -1532,13 +1561,18 @@ namespace field_reflection
             template <typename E>
             consteval std::span<const enum_entry<E>> get_enum_entries()
             {
-                std::vector<enum_entry<E>> entries(all_enum_entries<E>.begin(), all_enum_entries<E>.end());
+                const auto all = all_enum_entries<E>;
                 // sort by value and keep the first declared name for aliases
-                std::stable_sort(entries.begin(), entries.end(),
-                                 [](const enum_entry<E>& l, const enum_entry<E>& r) { return enum_less(l.value, r.value); });
-                entries.erase(std::unique(entries.begin(), entries.end(),
-                                          [](const enum_entry<E>& l, const enum_entry<E>& r) { return l.value == r.value; }),
-                              entries.end());
+                std::vector<std::size_t> indices(all.size());
+                for (std::size_t i = 0; i < indices.size(); ++i) indices[i] = i;
+                std::sort(indices.begin(), indices.end(), [&](std::size_t l, std::size_t r) {
+                    return enum_less(all[l].value, all[r].value) || (all[l].value == all[r].value && l < r);
+                });
+                std::vector<enum_entry<E>> entries;
+                for (auto i : indices)
+                {
+                    if (entries.empty() || entries.back().value != all[i].value) entries.push_back(all[i]);
+                }
                 return std::define_static_array(entries);
             }
 
@@ -1958,45 +1992,49 @@ namespace field_reflection
         // Number of distinct enumerator values of E
         template <typename E>
         requires std::is_enum_v<E>
-        constexpr std::size_t enum_count = detail::enum_count_value<E>;
+        constexpr std::size_t enum_count = detail::enum_count_value<std::remove_cv_t<E>>;
 
         // Distinct enumerator values of E in ascending order
         template <typename E>
         requires std::is_enum_v<E>
-        constexpr std::array<E, enum_count<E>> enum_values = detail::enum_values_value<E>;
+        constexpr std::array<std::remove_cv_t<E>, enum_count<E>> enum_values =
+            detail::enum_values_value<std::remove_cv_t<E>>;
 
         // Enumerator names corresponding to enum_values<E>. For aliases, the first declared name is used.
         template <typename E>
         requires std::is_enum_v<E>
-        constexpr std::array<std::string_view, enum_count<E>> enum_names = detail::enum_names_value<E>;
+        constexpr std::array<std::string_view, enum_count<E>> enum_names =
+            detail::enum_names_value<std::remove_cv_t<E>>;
 
         // Name of the enumerator whose value is equal to value, or an empty string if there is no such enumerator
         template <typename E>
         requires std::is_enum_v<E>
         constexpr std::string_view enum_name(E value) noexcept
         {
-            const auto& values = detail::enum_values_value<E>;
-            const auto it = std::lower_bound(values.begin(), values.end(), value, detail::enum_less<E>);
+            using V = std::remove_cv_t<E>;
+            const auto& values = detail::enum_values_value<V>;
+            const auto it = std::lower_bound(values.begin(), values.end(), value, detail::enum_less<V>);
             if (it == values.end() || *it != value) return {};
-            return detail::enum_names_value<E>[static_cast<std::size_t>(it - values.begin())];
+            return detail::enum_names_value<V>[static_cast<std::size_t>(it - values.begin())];
         }
 
         // Value of the enumerator named name. The C++20 backend recognizes only the names in enum_names<E>.
         template <typename E>
         requires std::is_enum_v<E>
-        constexpr std::optional<E> enum_cast(std::string_view name) noexcept
+        constexpr std::optional<std::remove_cv_t<E>> enum_cast(std::string_view name) noexcept
         {
+            using V = std::remove_cv_t<E>;
 #if FIELD_RFL_STD_REFLECTION
-            for (const auto& entry : detail::all_enum_entries<E>)
+            for (const auto& entry : detail::all_enum_entries<V>)
             {
                 if (name == entry.name) return entry.value;
             }
             return std::nullopt;
 #else
-            const auto& names = detail::enum_names_value<E>;
+            const auto& names = detail::enum_names_value<V>;
             for (std::size_t i = 0; i < names.size(); ++i)
             {
-                if (names[i] == name) return detail::enum_values_value<E>[i];
+                if (names[i] == name) return detail::enum_values_value<V>[i];
             }
             return std::nullopt;
 #endif

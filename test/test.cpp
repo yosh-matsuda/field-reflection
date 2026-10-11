@@ -1,10 +1,12 @@
 #include <gtest/gtest.h>
+#include <any>
 #include <array>
 #include <cstdint>
 #include <map>
 #include <memory>
 #include <optional>
 #include <string>
+#include <system_error>
 #include <variant>
 #include "field_reflection.hpp"
 
@@ -1008,5 +1010,167 @@ TEST(field_reflection, constexpr_api)
     static_assert(type_name<constexpr_struct> == "constexpr_struct");
     static_assert(enum_name(my_enum::blue) == "blue");
     static_assert(enum_cast<my_enum>("red") == my_enum::red);
+}
+struct hundred_fields
+{
+    int f0;
+    int f1;
+    int f2;
+    int f3;
+    int f4;
+    int f5;
+    int f6;
+    int f7;
+    int f8;
+    int f9;
+    int f10;
+    int f11;
+    int f12;
+    int f13;
+    int f14;
+    int f15;
+    int f16;
+    int f17;
+    int f18;
+    int f19;
+    int f20;
+    int f21;
+    int f22;
+    int f23;
+    int f24;
+    int f25;
+    int f26;
+    int f27;
+    int f28;
+    int f29;
+    int f30;
+    int f31;
+    int f32;
+    int f33;
+    int f34;
+    int f35;
+    int f36;
+    int f37;
+    int f38;
+    int f39;
+    int f40;
+    int f41;
+    int f42;
+    int f43;
+    int f44;
+    int f45;
+    int f46;
+    int f47;
+    int f48;
+    int f49;
+    int f50;
+    int f51;
+    int f52;
+    int f53;
+    int f54;
+    int f55;
+    int f56;
+    int f57;
+    int f58;
+    int f59;
+    int f60;
+    int f61;
+    int f62;
+    int f63;
+    int f64;
+    int f65;
+    int f66;
+    int f67;
+    int f68;
+    int f69;
+    int f70;
+    int f71;
+    int f72;
+    int f73;
+    int f74;
+    int f75;
+    int f76;
+    int f77;
+    int f78;
+    int f79;
+    int f80;
+    int f81;
+    int f82;
+    int f83;
+    int f84;
+    int f85;
+    int f86;
+    int f87;
+    int f88;
+    int f89;
+    int f90;
+    int f91;
+    int f92;
+    int f93;
+    int f94;
+    int f95;
+    int f96;
+    int f97;
+    int f98;
+    int f99;
+};
+struct any_first_member
+{
+    std::any a;
+    int b;
+};
+template <typename T>
+struct template_anonymous_union_member
+{
+    T tag;
+    union
+    {
+        int i;
+        float f;
+    };
+};
+TEST(field_reflection, edge_cases)
+{
+    static_assert(field_namable<hundred_fields>);
+    static_assert(field_count<hundred_fields> == 100);
+    static_assert(field_name<hundred_fields, 99> == "f99");
+
+    // A member that accepts an argument of any type is not mistaken for a base class.
+    static_assert(field_namable<any_first_member>);
+    static_assert(field_count<any_first_member> == 2);
+
+    static_assert(uncountable_or_count_is<template_anonymous_union_member<int>>(2));
+    static_assert(field_referenceable<template_anonymous_union_member<int>> == std_rfl);
+    static_assert(!field_namable<template_anonymous_union_member<int>>);
+}
+enum class opaque_enum : int;
+#if defined(__GNUC__) || defined(__clang__)
+enum class non_ascii_enum
+{
+    alpha,
+    βeta,
+};
+#endif
+TEST(field_reflection, enum_edge_cases)
+{
+    static_assert(enum_count<opaque_enum> == 0);
+    static_assert(enum_name(static_cast<opaque_enum>(0)).empty());
+
+    // std::to_underlying is not ambiguous with the internal function by ADL.
+    static_assert(enum_name(std::errc::invalid_argument) == "invalid_argument");
+    static_assert(enum_cast<std::errc>("invalid_argument") == std::errc::invalid_argument);
+
+#if defined(__GNUC__) || defined(__clang__)
+    static_assert(enum_names<non_ascii_enum> == std::array<std::string_view, 2>{"alpha", "βeta"});
+    static_assert(enum_cast<non_ascii_enum>("βeta") == non_ascii_enum::βeta);
+#endif
+
+    // cv-qualified enumeration types
+    static_assert(enum_count<const my_enum> == 3);
+    static_assert(std::is_same_v<decltype(enum_values<const volatile my_enum>), const std::array<my_enum, 3>>);
+    static_assert(enum_names<const my_enum> == enum_names<my_enum>);
+    static_assert(enum_name<const my_enum>(my_enum::blue) == "blue");
+    static_assert(std::is_same_v<decltype(enum_cast<const my_enum>("blue")), std::optional<my_enum>>);
+    static_assert(enum_cast<const my_enum>("blue") == my_enum::blue);
 }
 // NOLINTEND
