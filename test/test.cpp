@@ -1145,6 +1145,15 @@ TEST(field_reflection, edge_cases)
     static_assert(!field_namable<template_anonymous_union_member<int>>);
 }
 enum class opaque_enum : int;
+// The names take more than 255 characters, so that the offsets of the names do not fit in 8 bits.
+enum class long_name_enum
+{
+    long_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
+    long_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,
+    long_cccccccccccccccccccccccccccccccccccccccccccccccccc,
+    long_dddddddddddddddddddddddddddddddddddddddddddddddddd,
+    long_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee,
+};
 #if defined(__GNUC__) || defined(__clang__)
 enum class non_ascii_enum
 {
@@ -1156,6 +1165,13 @@ TEST(field_reflection, enum_edge_cases)
 {
     static_assert(enum_count<opaque_enum> == 0);
     static_assert(enum_name(static_cast<opaque_enum>(0)).empty());
+
+    static_assert(enum_count<long_name_enum> == 5);
+    static_assert(enum_name(long_name_enum::long_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee) ==
+                  "long_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee");
+    static_assert(enum_cast<long_name_enum>("long_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee") ==
+                  long_name_enum::long_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee);
+    static_assert(enum_names<long_name_enum>[3] == "long_dddddddddddddddddddddddddddddddddddddddddddddddddd");
 
     // std::to_underlying is not ambiguous with the internal function by ADL.
     static_assert(enum_name(std::errc::invalid_argument) == "invalid_argument");

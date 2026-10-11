@@ -39,6 +39,7 @@
 #include <cassert>
 #include <climits>  // CHAR_BIT
 #include <cstddef>
+#include <cstdint>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -50,6 +51,7 @@
 #if FIELD_RFL_STD_REFLECTION
 #include <meta>
 #include <span>
+#include <string>
 #include <vector>
 #endif
 
@@ -174,12 +176,86 @@ namespace field_reflection
                 return static_cast<std::underlying_type_t<E>>(e);
             }
 
-            template <typename E>
-            constexpr bool enum_less(E lhs, E rhs) noexcept
+            // The offsets of the names in the concatenated names, in the smallest type for the size of the names
+            template <std::size_t Chars>
+            using enum_offset_t = std::conditional_t<
+                Chars <= 0xff, std::uint8_t,
+                std::conditional_t<Chars <= 0xffff, std::uint16_t,
+                                   std::conditional_t<Chars <= 0xffffffff, std::uint32_t, std::size_t>>>;
+
+            // The enumerators of an enumeration with the underlying type U. The first count entries have the distinct
+            // values in ascending order with the first declared names. The other entries are the aliases. The name of
+            // entry i is chars[offsets[i]..offsets[i + 1] - 1), followed by a null character.
+            // An enum_data object is not stored in the program. enum_name and enum_cast pass its pointers as constants,
+            // which need no relocation in a position-independent executable, to the search functions below. These
+            // functions are instantiated for each U or O instead of each enumeration and are not inlined, so that an
+            // enumeration adds only its arrays and the calls to the program.
+            template <typename U, typename O>
+            struct enum_data
             {
-                // qualified so that argument-dependent lookup does not find std::to_underlying
-                return detail::to_underlying(lhs) < detail::to_underlying(rhs);
+                const U* values;
+                const O* offsets;  // size + 1 elements
+                const char* chars;
+                std::size_t count;
+                std::size_t size;
+                bool contiguous;  // the distinct values are consecutive integers
+            };
+
+            template <typename U, typename O>
+            consteval enum_data<U, O> make_enum_data(const U* values, const O* offsets, const char* chars,
+                                                     std::size_t count, std::size_t size)
+            {
+                // The difference is computed in unsigned integers to avoid overflow.
+                const bool contiguous = count > 0 && static_cast<unsigned long long>(values[count - 1]) -
+                                                             static_cast<unsigned long long>(values[0]) ==
+                                                         count - 1;
+                return {values, offsets, chars, count, size, contiguous};
             }
+
+            template <typename O>
+            constexpr std::string_view enum_entry_name(const O* offsets, const char* chars, std::size_t i) noexcept
+            {
+                return std::string_view(chars + offsets[i], static_cast<std::size_t>(offsets[i + 1] - offsets[i] - 1));
+            }
+
+#if defined(_MSC_VER) && !defined(__clang__)
+#define FIELD_RFL_NOINLINE __declspec(noinline)
+#elif defined(__GNUC__) || defined(__clang__)
+#define FIELD_RFL_NOINLINE __attribute__((noinline))
+#else
+#define FIELD_RFL_NOINLINE
+#endif
+
+            // The index of the distinct value, or count if not found
+            template <typename U>
+            FIELD_RFL_NOINLINE constexpr std::size_t find_enum_value_index(const U* values, std::size_t count,
+                                                                           U value) noexcept
+            {
+                std::size_t lo = 0, hi = count;
+                while (lo < hi)
+                {
+                    const auto mid = lo + (hi - lo) / 2;
+                    if (values[mid] < value)
+                        lo = mid + 1;
+                    else
+                        hi = mid;
+                }
+                return lo != count && values[lo] == value ? lo : count;
+            }
+
+            // The index of the entry named name, or size if not found
+            template <typename O>
+            FIELD_RFL_NOINLINE constexpr std::size_t find_enum_name_index(const O* offsets, const char* chars,
+                                                                          std::size_t size,
+                                                                          std::string_view name) noexcept
+            {
+                for (std::size_t i = 0; i < size; ++i)
+                {
+                    if (name == enum_entry_name(offsets, chars, i)) return i;
+                }
+                return size;
+            }
+#undef FIELD_RFL_NOINLINE
         }  // namespace detail
 
 #if !FIELD_RFL_STD_REFLECTION
@@ -1069,70 +1145,351 @@ namespace field_reflection
             template <typename E, long long V>
             constexpr std::string_view enum_name_of_value = get_enum_name<E, V>();
 
-            template <typename E, long long... Is>
-            consteval auto get_enum_names_in_range(std::integer_sequence<long long, Is...>)
+            template <auto... Vs>
+            consteval std::string_view get_enum_values_function_name()
             {
-                return std::array<std::string_view, sizeof...(Is)>{enum_name_of_value<E, enum_range_min<E> + Is>...};
+#if defined(__clang__) && defined(_WIN32)
+                return std::string_view{__PRETTY_FUNCTION__};
+#else
+                return std::string_view{std::source_location::current().function_name()};
+#endif
+            }
+
+            // Clang rejects a value out of the range of an enumeration without a fixed underlying type in a pack of
+            // values, but accepts it in a template argument of a class template. The values of such an enumeration,
+            // or of an enumeration whose name contains ", ", are passed in this wrapper, which makes the function name
+            // longer but gives a separator that contains the name of the wrapper.
+            template <auto V>
+            struct enum_value_tag
+            {
+            };
+
+            template <typename... Tags>
+            consteval std::string_view get_enum_tags_function_name()
+            {
+#if defined(__clang__) && defined(_WIN32)
+                return std::string_view{__PRETTY_FUNCTION__};
+#else
+                return std::string_view{std::source_location::current().function_name()};
+#endif
             }
 
             template <typename E>
-            constexpr auto enum_names_in_range = get_enum_names_in_range<E>(
-                std::make_integer_sequence<long long, enum_range_max<E> - enum_range_min<E> + 1>());
+            concept enum_has_fixed_underlying_type = requires { E{std::underlying_type_t<E>{}}; };
 
-            template <typename E>
-            constexpr std::size_t enum_count_value =
-                static_cast<std::size_t>(std::count_if(enum_names_in_range<E>.begin(), enum_names_in_range<E>.end(),
-                                                       [](std::string_view s) { return !s.empty(); }));
+            // The builtins to compare and find characters are evaluated much faster than loops in constant evaluation.
+            // They require null-terminated strings, such as function names and string literals.
+            constexpr bool chars_equal(const char* a, const char* b, std::size_t n)
+            {
+#if defined(__GNUC__) || defined(__clang__)
+                return __builtin_memcmp(a, b, n) == 0;
+#else
+                return std::string_view(a, n) == std::string_view(b, n);
+#endif
+            }
 
-            template <typename E>
-            constexpr auto enum_values_value = []() {
-                std::array<E, enum_count_value<E>> values{};
-                std::size_t k = 0;
-                for (std::size_t i = 0; i < enum_names_in_range<E>.size(); ++i)
+            // Returns the position of the first text in s at or after from, or std::string_view::npos.
+            constexpr std::size_t find_text(std::string_view s, const char* text, std::size_t from)
+            {
+#if defined(__GNUC__) && !defined(__clang__)
+                const char* p = __builtin_strstr(s.data() + from, text);
+                return p == nullptr ? std::string_view::npos : static_cast<std::size_t>(p - s.data());
+#else
+                const auto n = std::string_view(text).size();
+                for (; s.size() - from >= n; ++from)
                 {
-                    if (!enum_names_in_range<E>[i].empty())
-                    {
-                        values[k++] = static_cast<E>(enum_range_min<E> + static_cast<long long>(i));
-                    }
+#if defined(__clang__)
+                    const char* p = __builtin_char_memchr(s.data() + from, text[0], s.size() - from - n + 1);
+                    if (p == nullptr) break;
+                    from = static_cast<std::size_t>(p - s.data());
+#endif
+                    if (chars_equal(s.data() + from, text, n)) return from;
                 }
-                return values;
+                return std::string_view::npos;
+#endif
+            }
+
+            // A name in a chunk of values: the index of the value in the chunk and the name in the function name
+            struct enum_chunk_name
+            {
+                std::size_t index;
+                const char* name;
+                std::size_t size;
+            };
+
+            // The named values in a chunk of N values
+            template <std::size_t N>
+            struct enum_chunk_result
+            {
+                bool ok = false;
+                std::size_t count = 0;
+                std::size_t chars_size = 0;  // the total size of the names
+                enum_chunk_name names[N] = {};
+            };
+
+            // Parses the function name of a function template with the arguments (D, D, v_0, ..., v_{N-1}, D), where D
+            // is the detector, and each argument may be wrapped in enum_value_tag. The text of D and the separator,
+            // such as ", " or ">, field_reflection::detail::enum_value_tag<", are taken from the first two arguments.
+            // The result is used only if the text after the N values is D, so that a format that is not expected,
+            // e.g., a separator in the name of the enumeration, falls back to get_enum_name for each value.
+            // The loop calls no function but the builtins to find a character, which are evaluated much faster than
+            // a loop in constant evaluation. They require the null-terminated function name.
+            template <std::size_t N>
+            consteval enum_chunk_result<N> parse_enum_values_function_name(std::string_view name)
+            {
+                constexpr auto detector = std::string_view("detector_value");
+                const char* const chars = name.data();
+                const auto size = name.size();
+                const auto is_qualified_name_char = [](char c) { return c == ':' || is_identifier_char(c); };
+
+                const auto first_end = find_text(name, detector.data(), 0);
+                if (first_end == std::string_view::npos) return {};
+                auto detector_begin = first_end;
+                while (detector_begin > 0 && is_qualified_name_char(chars[detector_begin - 1])) --detector_begin;
+                const auto detector_text = name.substr(detector_begin, first_end + detector.size() - detector_begin);
+
+                const auto second = find_text(name, detector.data(), first_end + detector.size());
+                if (second == std::string_view::npos) return {};
+                const auto separator_begin = first_end + detector.size();
+                const auto separator_end = second + detector.size() - detector_text.size();
+                if (second + detector.size() < separator_begin + detector_text.size() ||
+                    !chars_equal(chars + separator_end, detector_text.data(), detector_text.size()))
+                {
+                    return {};
+                }
+                const char* const separator = chars + separator_begin;
+                const auto separator_size = separator_end - separator_begin;
+                if (separator_size == 0) return {};
+
+                enum_chunk_result<N> result{true};
+                const char* const end = chars + size;
+                const char* p = chars + second + detector.size();
+                const char separator_first = separator[0];
+                // An unnamed value is printed as a cast and a number, such as "(E)5" or "(E)-5", whose text "(E)" is
+                // the same for all values. Its size is taken from the first unnamed value to skip the text of the
+                // others, which are found by "(" at the beginning and ")" at the end of the cast. A named value
+                // differs in either character, e.g., "E::a" or "(anonymous namespace)::E::a" for "((anonymous
+                // namespace)::E)5". The number has no character of the separator. Each operation is slow in constant
+                // evaluation, so the loop does as few operations as possible for an unnamed value.
+                std::size_t cast_size = 0;
+                const char* cast_limit = chars;  // p < cast_limit if p + cast_size < end
+                // The text before the first value (i == 0) is the separator after the second detector.
+                for (std::size_t i = 0; i <= N; ++i)
+                {
+                    const char* q = p;
+                    if (p < cast_limit && *p == '(' && p[cast_size - 1] == ')')
+                    {
+#if defined(__clang__)
+                        q = __builtin_char_memchr(p + cast_size, separator_first,
+                                                  static_cast<std::size_t>(end - p) - cast_size);
+#elif defined(__GNUC__)
+                        q = __builtin_strchr(p + cast_size, separator_first);
+#else
+                        q = p + cast_size;
+                        while (q != end && *q != separator_first) ++q;
+                        if (q == end) q = nullptr;
+#endif
+                        if (q != nullptr && static_cast<std::size_t>(end - q) >= separator_size &&
+#if defined(__GNUC__) || defined(__clang__)
+                            __builtin_memcmp(q + 1, separator + 1, separator_size - 1) == 0)
+#else
+                            chars_equal(q + 1, separator + 1, separator_size - 1))
+#endif
+                        {
+                            p = q + separator_size;
+                            continue;
+                        }
+                        q = p;
+                    }
+                    for (;; ++q)
+                    {
+#if defined(__clang__)
+                        q = __builtin_char_memchr(q, separator_first, static_cast<std::size_t>(end - q));
+#elif defined(__GNUC__)
+                        q = __builtin_strchr(q, separator_first);
+#else
+                        while (q != end && *q != separator_first) ++q;
+                        if (q == end) q = nullptr;
+#endif
+                        if (q == nullptr || static_cast<std::size_t>(end - q) < separator_size) return {};
+                        std::size_t k = 1;
+                        while (k < separator_size && q[k] == separator[k]) ++k;
+                        if (k == separator_size) break;
+                    }
+                    if (i == 0)
+                    {
+                        if (q != p) return {};
+                        p = q + separator_size;
+                        continue;
+                    }
+                    // is_identifier_char is inlined, since a function call is slow in constant evaluation.
+                    auto first = q;
+                    for (; first != p; --first)
+                    {
+                        const auto c = first[-1];
+                        if (!(c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
+                              static_cast<unsigned char>(c) >= 0x80))
+                        {
+                            break;
+                        }
+                    }
+                    // An unnamed value is printed as a number, such as "(E)5" or "0x5".
+                    if (first == q || (*first >= '0' && *first <= '9'))
+                    {
+                        const auto cast_end = first != p && first[-1] == '-' ? first - 1 : first;
+                        if (cast_size == 0 && *p == '(' && cast_end - p > 1 && cast_end[-1] == ')')
+                        {
+                            cast_size = static_cast<std::size_t>(cast_end - p);
+                            cast_limit = end - cast_size;
+                        }
+                    }
+                    else
+                    {
+                        const auto name_size = static_cast<std::size_t>(q - first);
+                        result.names[result.count++] = {i - 1, first, name_size};
+                        result.chars_size += name_size;
+                    }
+                    p = q + separator_size;
+                }
+                const auto pos = static_cast<std::size_t>(p - chars);
+                if (size - pos < detector_text.size() || !chars_equal(p, detector_text.data(), detector_text.size()) ||
+                    (pos + detector_text.size() < size && is_qualified_name_char(chars[pos + detector_text.size()])))
+                {
+                    return {};
+                }
+                return result;
+            }
+
+            // The results are variable templates, since the initializer of a constexpr local variable is evaluated
+            // again whenever the enclosing function is evaluated (Clang).
+            template <typename E, long long First, long long... Is>
+            constexpr auto enum_chunk_by_values = []() {
+                using U = std::underlying_type_t<E>;
+                constexpr auto d = enum_name_detector::detector_value;
+                // A pack of values gives a shorter function name, but its separator ", " may appear in the name of the
+                // enumeration, e.g., a member of a class template S<int, long>.
+                if constexpr (enum_has_fixed_underlying_type<E>)
+                {
+                    return parse_enum_values_function_name<sizeof...(Is)>(
+                        get_enum_values_function_name<d, d, std::bit_cast<E>(static_cast<U>(First + Is))..., d>());
+                }
+                else
+                {
+                    return enum_chunk_result<sizeof...(Is)>{};
+                }
             }();
 
-            // The names of the enumerators of E concatenated with null terminators.
-            template <typename E>
-            constexpr auto enum_name_chars = []() {
-                constexpr auto size = []() {
-                    std::size_t n = 0;
-                    for (const auto name : enum_names_in_range<E>)
-                    {
-                        if (!name.empty()) n += name.size() + 1;
-                    }
-                    return n;
-                }();
-                std::array<char, size> chars{};
-                std::size_t k = 0;
-                for (const auto name : enum_names_in_range<E>)
-                {
-                    if (name.empty()) continue;
-                    std::copy_n(name.begin(), name.size(), chars.begin() + k);
-                    k += name.size() + 1;
-                }
-                return chars;
+            template <typename E, long long First, long long... Is>
+            constexpr auto enum_chunk_by_tags = []() {
+                using U = std::underlying_type_t<E>;
+                constexpr auto d = enum_name_detector::detector_value;
+                return parse_enum_values_function_name<sizeof...(Is)>(
+                    get_enum_tags_function_name<enum_value_tag<d>, enum_value_tag<d>,
+                                                enum_value_tag<std::bit_cast<E>(static_cast<U>(First + Is))>...,
+                                                enum_value_tag<d>>());
             }();
 
+            template <typename E, long long First, long long... Is>
+            constexpr auto enum_chunk_by_names = []() {
+                constexpr std::string_view names[] = {enum_name_of_value<E, First + Is>...};
+                enum_chunk_result<sizeof...(Is)> result{true};
+                for (std::size_t i = 0; i < sizeof...(Is); ++i)
+                {
+                    if (names[i].empty()) continue;
+                    result.names[result.count++] = {i, names[i].data(), names[i].size()};
+                    result.chars_size += names[i].size();
+                }
+                return result;
+            }();
+
+            template <typename E, long long First, long long... Is>
+            consteval const auto& get_enum_chunk(std::integer_sequence<long long, Is...>)
+            {
+                if constexpr (enum_chunk_by_values<E, First, Is...>.ok)
+                {
+                    return enum_chunk_by_values<E, First, Is...>;
+                }
+                else if constexpr (enum_chunk_by_tags<E, First, Is...>.ok)
+                {
+                    return enum_chunk_by_tags<E, First, Is...>;
+                }
+                else
+                {
+                    return enum_chunk_by_names<E, First, Is...>;
+                }
+            }
+
+            // The values are read in chunks to bound the number of steps of each constant evaluation.
+            inline constexpr long long enum_chunk_size = 512;
+
+            template <typename E, long long First, long long N>
+            constexpr auto enum_chunk = get_enum_chunk<E, First>(std::make_integer_sequence<long long, N>());
+
+            // Calls f(chunk, the first value of the chunk) for each chunk of the values in enum_range<E>.
+            template <typename E, typename F>
+            constexpr void for_each_enum_chunk(F f)
+            {
+                constexpr auto min = enum_range_min<E>;
+                constexpr auto size = enum_range_max<E> - min + 1;
+                [&]<std::size_t... Cs>(std::index_sequence<Cs...>) {
+                    (f(enum_chunk<E, min + static_cast<long long>(Cs) * enum_chunk_size,
+                                  std::min(enum_chunk_size, size - static_cast<long long>(Cs) * enum_chunk_size)>,
+                       min + static_cast<long long>(Cs) * enum_chunk_size),
+                     ...);
+                }(std::make_index_sequence<static_cast<std::size_t>((size + enum_chunk_size - 1) / enum_chunk_size)>());
+            }
+
+            struct enum_sizes
+            {
+                std::size_t count = 0;
+                std::size_t chars_size = 0;  // including null terminators
+            };
+
             template <typename E>
-            constexpr auto enum_names_value = []() {
-                std::array<std::string_view, enum_count_value<E>> names{};
+            constexpr enum_sizes enum_sizes_v = []() {
+                enum_sizes sizes{};
+                for_each_enum_chunk<E>([&](const auto& chunk, long long) {
+                    sizes.count += chunk.count;
+                    sizes.chars_size += chunk.chars_size + chunk.count;
+                });
+                return sizes;
+            }();
+
+            template <typename U, std::size_t N, std::size_t M>
+            struct enum_table
+            {
+                std::array<U, N> values;
+                std::array<enum_offset_t<M>, N + 1> offsets;
+                std::array<char, M> chars;
+            };
+
+            // The chars have a null character at least, so that they are not empty.
+            template <typename E>
+            constexpr auto enum_table_v = []() {
+                using U = std::underlying_type_t<E>;
+                using O = enum_offset_t<enum_sizes_v<E>.chars_size + 1>;
+                enum_table<U, enum_sizes_v<E>.count, enum_sizes_v<E>.chars_size + 1> table{};
                 std::size_t k = 0;
                 std::size_t offset = 0;
-                for (const auto name : enum_names_in_range<E>)
-                {
-                    if (name.empty()) continue;
-                    names[k++] = std::string_view(enum_name_chars<E>.data() + offset, name.size());
-                    offset += name.size() + 1;
-                }
-                return names;
+                for_each_enum_chunk<E>([&](const auto& chunk, long long first) {
+                    for (std::size_t i = 0; i < chunk.count; ++i)
+                    {
+                        const auto& name = chunk.names[i];
+                        table.values[k] = static_cast<U>(first + static_cast<long long>(name.index));
+                        table.offsets[k++] = static_cast<O>(offset);
+                        std::copy_n(name.name, name.size, table.chars.begin() + static_cast<std::ptrdiff_t>(offset));
+                        offset += name.size + 1;
+                    }
+                });
+                table.offsets[k] = static_cast<O>(offset);
+                return table;
             }();
+
+            // The values in the range are distinct and sorted, so that there are no aliases.
+            template <typename E>
+            constexpr auto enum_data_v = make_enum_data(enum_table_v<E>.values.data(), enum_table_v<E>.offsets.data(),
+                                                        enum_table_v<E>.chars.data(), enum_table_v<E>.values.size(),
+                                                        enum_table_v<E>.values.size());
         }  // namespace detail
 
         // The options only extend the set of reflectable types with the C++26 backend, so they are ignored here.
@@ -1425,63 +1782,87 @@ namespace field_reflection
                 }
             }
 
-            template <typename E>
-            struct enum_entry
+            template <typename U>
+            struct enum_names_data
             {
-                E value;
-                const char* name;
+                const U* values;
+                const char* chars;  // the names concatenated with null terminators
+                std::size_t chars_size;
+                std::size_t count;
+                std::size_t size;
             };
 
-            // All enumerators in declaration order, including aliases. An enumeration declared by an opaque
-            // declaration, e.g., `enum class E : int;`, has no enumerators.
-            template <typename E>
-            consteval std::span<const enum_entry<E>> get_all_enum_entries()
+            // The arrays hold the underlying values so that enumerations with the same underlying type share the
+            // instantiations of std::vector and std::define_static_array, which take most of the compile time.
+            // An enumeration declared by an opaque declaration, e.g., `enum class E : int;`, has no enumerators.
+            // The enumerators are sorted by insertion sort, which is stable, so that the first declared name of each
+            // value comes first.
+            template <typename E, typename U = std::underlying_type_t<E>>
+            consteval enum_names_data<U> get_enum_names_data()
             {
-                std::vector<enum_entry<E>> entries;
-                if (!meta::is_enumerable_type(^^E)) return {};
-                for (auto e : meta::enumerators_of(^^E))
+                if (!meta::is_enumerable_type(^^E)) return {nullptr, "", 0, 0, 0};
+                const auto enumerators = meta::enumerators_of(^^E);
+                const auto n = enumerators.size();
+                std::vector<U> declared_values(n);
+                std::vector<std::size_t> order(n);
+                for (std::size_t i = 0; i < n; ++i)
                 {
-                    entries.push_back({meta::extract<E>(e), std::define_static_string(meta::identifier_of(e))});
+                    const auto value = static_cast<U>(meta::extract<E>(enumerators[i]));
+                    declared_values[i] = value;
+                    auto j = i;
+                    for (; j > 0 && value < declared_values[order[j - 1]]; --j) order[j] = order[j - 1];
+                    order[j] = i;
                 }
-                return std::define_static_array(entries);
+                std::vector<U> values;
+                values.reserve(n);
+                std::string chars;
+                std::vector<std::size_t> aliases;
+                const auto append = [&](std::size_t i) {
+                    values.push_back(declared_values[i]);
+                    chars.append(meta::identifier_of(enumerators[i]));
+                    chars.push_back('\0');
+                };
+                for (std::size_t j = 0; j < n; ++j)
+                {
+                    if (j == 0 || declared_values[order[j - 1]] != declared_values[order[j]])
+                        append(order[j]);
+                    else
+                        aliases.push_back(order[j]);
+                }
+                const auto count = values.size();
+                // The aliases are appended in declaration order.
+                for (std::size_t k = 1; k < aliases.size(); ++k)
+                {
+                    const auto i = aliases[k];
+                    auto j = k;
+                    for (; j > 0 && i < aliases[j - 1]; --j) aliases[j] = aliases[j - 1];
+                    aliases[j] = i;
+                }
+                for (const auto i : aliases) append(i);
+                return {std::define_static_array(values).data(), std::define_static_string(chars), chars.size(), count,
+                        values.size()};
             }
 
             template <typename E>
-            constexpr std::span<const enum_entry<E>> all_enum_entries = get_all_enum_entries<E>();
+            constexpr auto enum_names_data_v = get_enum_names_data<E>();
 
-            template <typename E>
-            consteval std::span<const enum_entry<E>> get_enum_entries()
+            // The type of the offsets depends on the size of the names, so that the offsets are computed after them.
+            template <typename E, typename U = std::underlying_type_t<E>,
+                      typename O = enum_offset_t<enum_names_data_v<E>.chars_size>>
+            consteval enum_data<U, O> get_enum_data()
             {
-                const auto all = all_enum_entries<E>;
-                // sort by value and keep the first declared name for aliases
-                std::vector<std::size_t> indices(all.size());
-                for (std::size_t i = 0; i < indices.size(); ++i) indices[i] = i;
-                std::sort(indices.begin(), indices.end(), [&](std::size_t l, std::size_t r) {
-                    return enum_less(all[l].value, all[r].value) || (all[l].value == all[r].value && l < r);
-                });
-                std::vector<enum_entry<E>> entries;
-                for (auto i : indices)
+                constexpr auto& names = enum_names_data_v<E>;
+                std::array<O, names.size + 1> offsets{};
+                for (std::size_t i = 0, k = 0; i < names.chars_size; ++i)
                 {
-                    if (entries.empty() || entries.back().value != all[i].value) entries.push_back(all[i]);
+                    if (names.chars[i] == '\0') offsets[++k] = static_cast<O>(i + 1);
                 }
-                return std::define_static_array(entries);
+                return make_enum_data(names.values, std::define_static_array(offsets).data(), names.chars, names.count,
+                                      names.size);
             }
 
             template <typename E>
-            constexpr std::span<const enum_entry<E>> enum_entries = get_enum_entries<E>();
-
-            template <typename E>
-            constexpr std::size_t enum_count_value = enum_entries<E>.size();
-
-            template <typename E>
-            constexpr auto enum_values_value = []<std::size_t... Is>(std::index_sequence<Is...>) {
-                return std::array<E, sizeof...(Is)>{enum_entries<E>[Is].value...};
-            }(std::make_index_sequence<enum_count_value<E>>());
-
-            template <typename E>
-            constexpr auto enum_names_value = []<std::size_t... Is>(std::index_sequence<Is...>) {
-                return std::array<std::string_view, sizeof...(Is)>{std::string_view(enum_entries<E>[Is].name)...};
-            }(std::make_index_sequence<enum_count_value<E>>());
+            constexpr auto enum_data_v = get_enum_data<E>();
 
 #if FIELD_RFL_ANNOTATIONS
             template <meta::info R, typename A>
@@ -1927,6 +2308,23 @@ namespace field_reflection
             return any_of_field<reflect_options{}>(std::forward<T>(t), std::forward<Func>(func));
         }
 
+        namespace detail
+        {
+            template <typename E>
+            constexpr std::size_t enum_count_value = enum_data_v<E>.count;
+
+            template <typename E>
+            constexpr auto enum_values_value = []<std::size_t... Is>(std::index_sequence<Is...>) {
+                return std::array<E, sizeof...(Is)>{static_cast<E>(enum_data_v<E>.values[Is])...};
+            }(std::make_index_sequence<enum_count_value<E>>());
+
+            template <typename E>
+            constexpr auto enum_names_value = []<std::size_t... Is>(std::index_sequence<Is...>) {
+                return std::array<std::string_view, sizeof...(Is)>{
+                    enum_entry_name(enum_data_v<E>.offsets, enum_data_v<E>.chars, Is)...};
+            }(std::make_index_sequence<enum_count_value<E>>());
+        }  // namespace detail
+
         // Number of distinct enumerator values of E
         template <typename E>
         requires std::is_enum_v<E>
@@ -1950,10 +2348,22 @@ namespace field_reflection
         constexpr std::string_view enum_name(E value) noexcept
         {
             using V = std::remove_cv_t<E>;
-            const auto& values = detail::enum_values_value<V>;
-            const auto it = std::lower_bound(values.begin(), values.end(), value, detail::enum_less<V>);
-            if (it == values.end() || *it != value) return {};
-            return detail::enum_names_value<V>[static_cast<std::size_t>(it - values.begin())];
+            constexpr auto& data = detail::enum_data_v<V>;
+            const auto u = static_cast<std::underlying_type_t<V>>(value);
+            std::size_t i;
+            if constexpr (data.contiguous)
+            {
+                // The difference is computed in unsigned integers to avoid overflow.
+                i = static_cast<std::size_t>(static_cast<unsigned long long>(u) -
+                                             static_cast<unsigned long long>(data.values[0]));
+                if (i >= data.count) return {};
+            }
+            else
+            {
+                i = detail::find_enum_value_index(data.values, data.count, u);
+                if (i == data.count) return {};
+            }
+            return detail::enum_entry_name(data.offsets, data.chars, i);
         }
 
         // Value of the enumerator named name. The C++20 backend recognizes only the names in enum_names<E>.
@@ -1962,20 +2372,10 @@ namespace field_reflection
         constexpr std::optional<std::remove_cv_t<E>> enum_cast(std::string_view name) noexcept
         {
             using V = std::remove_cv_t<E>;
-#if FIELD_RFL_STD_REFLECTION
-            for (const auto& entry : detail::all_enum_entries<V>)
-            {
-                if (name == entry.name) return entry.value;
-            }
-            return std::nullopt;
-#else
-            const auto& names = detail::enum_names_value<V>;
-            for (std::size_t i = 0; i < names.size(); ++i)
-            {
-                if (names[i] == name) return detail::enum_values_value<V>[i];
-            }
-            return std::nullopt;
-#endif
+            constexpr auto& data = detail::enum_data_v<V>;
+            const auto i = detail::find_enum_name_index(data.offsets, data.chars, data.size, name);
+            if (i == data.size) return std::nullopt;
+            return static_cast<V>(data.values[i]);
         }
     }  // inline namespace
 }  // namespace field_reflection
