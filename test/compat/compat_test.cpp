@@ -47,7 +47,8 @@ TEST(compat, expected_results)
     EXPECT_EQ(legacy.at("std::monostate"), "countable=1 referenceable=1 namable=1 count=0 types= names=");
     EXPECT_EQ(legacy.at("int[3]"), "countable=0 referenceable=0 namable=0");
     EXPECT_EQ(legacy.at("std::array<int, 3>"), "countable=0 referenceable=0 namable=0");
-    EXPECT_EQ(legacy.at("derived"), "countable=1 referenceable=0 namable=0 count=3");
+    EXPECT_EQ(legacy.at("derived"), "countable=0 referenceable=0 namable=0");
+    EXPECT_EQ(legacy.at("derived_empty_base"), "countable=0 referenceable=0 namable=0");
     EXPECT_EQ(legacy.at("enum color"), "count=3 entries=red:1,green:2,blue:4,");
     EXPECT_EQ(legacy.at("enum plain_enum"), "count=2 entries=pe_a:0,pe_b:10,");
 

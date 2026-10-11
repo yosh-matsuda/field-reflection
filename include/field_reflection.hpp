@@ -415,13 +415,12 @@ namespace field_reflection
             }();
 
             // The number of initializers of aggregate initialization counts the elements of C array members.
-            // Count such a member as one field unless T has a base class, whose fields are counted in the same
-            // way as by brace elision.
+            // Count such a member as one field.
             template <typename T>
             requires std::is_aggregate_v<T>
             constexpr std::size_t field_count_value = []() {
                 constexpr auto max_args = field_count_impl<T, 0>;
-                if constexpr (max_args == std::numeric_limits<std::size_t>::max() || has_base<T>)
+                if constexpr (max_args == std::numeric_limits<std::size_t>::max())
                 {
                     return max_args;
                 }
@@ -445,9 +444,12 @@ namespace field_reflection
                 }
             }();
 
+            // The fields of a base class cannot be counted correctly by aggregate initialization, e.g., an empty base
+            // class takes an initializer and a C array member of a base class takes one for each element.
             template <typename T>
-            concept field_countable = std::is_class_v<T> && (!tuple_like<T>) && std::is_aggregate_v<T> &&
-                                      requires { requires field_count_value<T> <= max_field_count<T>; };
+            concept field_countable =
+                std::is_class_v<T> && (!tuple_like<T>) && std::is_aggregate_v<T> && (!has_base<T>) &&
+                requires { requires field_count_value<T> <= max_field_count<T>; };
 
             template <field_countable T>
             constexpr std::size_t field_count = field_count_value<T>;
@@ -501,7 +503,7 @@ namespace field_reflection
 #undef FIELD_RFL_HAS_STRUCTURED_BINDING_SIZE
 
             template <typename T>
-            concept decomposable = field_countable<T> && (!has_base<T>) && is_decomposable<T>;
+            concept decomposable = field_countable<T> && is_decomposable<T>;
 
             template <typename T, bool NoBitFields>
             struct field_type_info

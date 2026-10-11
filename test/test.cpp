@@ -193,8 +193,9 @@ TEST(field_reflection, concept)
     static_assert(field_countable<my_struct3>);
     static_assert(field_countable<my_struct4>);
     static_assert(field_countable<my_struct5>);
-    static_assert(field_countable<my_struct6>);
-    static_assert(field_countable<my_struct7>);
+    // The C++20 backend cannot tell the members of base classes apart from the fields of the derived class
+    static_assert(field_countable<my_struct6> == std_rfl);
+    static_assert(field_countable<my_struct7> == std_rfl);
     static_assert(field_countable<my_struct8> == std_rfl);
     static_assert(field_countable<my_struct9>);
     static_assert(field_countable<named::my_struct10>);
@@ -279,9 +280,9 @@ TEST(field_reflection, field_count)
     static_assert(field_count<my_struct3> == 2);
     static_assert(field_count<my_struct4> == 1);
     static_assert(field_count<my_struct5> == 1);
+#if FIELD_RFL_STD_REFLECTION
     static_assert(field_count<my_struct6> == 5);
     static_assert(field_count<my_struct7> == 6);
-#if FIELD_RFL_STD_REFLECTION
     static_assert(field_count<my_struct8> == 2);
 #endif
     static_assert(field_count<my_struct9> == 1);
