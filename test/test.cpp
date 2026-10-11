@@ -819,6 +819,13 @@ TEST(field_reflection, explicit_template_arguments)
     EXPECT_EQ(std::get<0>(to_tuple<opts>(s)), 2);
     for_each_field<opts>(s, [&](auto&) { ++count; });
     EXPECT_EQ(count, 2 * field_count<my_struct1>);
+
+    // get_field of an rvalue is noexcept unless copying or moving the field may throw
+    static_assert(noexcept(get_field<0>(std::move(s))));
+    static_assert(noexcept(get_field<2>(std::move(s))));
+    static_assert(!noexcept(get_field<2>(std::move(cs))));
+    static_assert(noexcept(get_field<0, opts>(std::move(s))));
+    static_assert(!noexcept(get_field<2, opts>(std::move(cs))));
 }
 struct array_members
 {
