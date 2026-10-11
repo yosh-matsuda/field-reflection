@@ -287,6 +287,60 @@ TEST(std_reflection, bit_fields)
     EXPECT_EQ(std::get<2>(t), 3);
 }
 
+TEST(std_reflection, bit_fields_in_visitors)
+{
+    constexpr auto opt = reflect_options{.bit_fields = true};
+
+    // a visitor gets a bit-field of a non-const lvalue as an lvalue and its assignment is written back
+    bit_field b{1, 2, 3};
+    for_each_field<opt>(b, [](auto& v) { v += 1; });
+    EXPECT_EQ(b.a, 2);
+    EXPECT_EQ(b.b, 3U);
+    EXPECT_EQ(b.c, 4);
+    for_each_field<opt>(b, [](std::string_view name, auto&& v) {
+        if (name == "b") v = 9U;
+    });
+    EXPECT_EQ(b.b, 9U);
+
+    // the value is written back when the visitor returns, before the next field is visited
+    for_each_field<opt>(b, [&](std::string_view name, auto& v) {
+        if (name == "a") v = 0;
+        if (name == "b") EXPECT_EQ(b.a, 0);
+    });
+
+    // with two objects
+    bit_field src{-2, 17, 5};
+    for_each_field<opt>(b, src, [](auto& l, const auto& r) { l = r; });
+    EXPECT_EQ(b.a, -2);
+    EXPECT_EQ(b.b, 17U);
+    EXPECT_EQ(b.c, 5);
+
+    // predicates
+    EXPECT_FALSE(all_of_field<opt>(b, [](auto& v) { return (v = 0) != 0; }));
+    EXPECT_EQ(b.a, 0);
+    EXPECT_EQ(b.b, 17U);  // not visited
+    EXPECT_TRUE(any_of_field<opt>(b, [](std::string_view name, auto& v) { return name == "b" && (v = 1); }));
+    EXPECT_EQ(b.b, 1U);
+
+    // a bit-field of a const lvalue is a const lvalue, and of an rvalue is an xvalue
+    const bit_field cb{1, 2, 3};
+    constexpr auto assignable = []<typename T>(T&& t) {
+        return requires { for_each_field<opt>(std::forward<T>(t), [](auto& v) -> decltype(void(v = {})) {}); };
+    };
+    static_assert(assignable(b));
+    static_assert(!assignable(cb));
+    for_each_field<opt>(cb,
+                        [](const auto& v) { static_assert(std::is_const_v<std::remove_reference_t<decltype(v)>>); });
+    for_each_field<opt>(bit_field{1, 2, 3}, [](auto&& v) { static_assert(std::is_rvalue_reference_v<decltype(v)>); });
+
+    // in constant evaluation
+    static_assert([] {
+        bit_field c{1, 2, 3};
+        for_each_field<opt>(c, [](auto& v) { v *= 2; });
+        return c.a == 2 && c.b == 4U && c.c == 6;
+    }());
+}
+
 TEST(std_reflection, non_aggregate)
 {
     constexpr auto opt = reflect_options{.non_aggregate = true};

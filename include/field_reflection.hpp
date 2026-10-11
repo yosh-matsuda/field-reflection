@@ -1768,11 +1768,52 @@ namespace field_reflection
                 return field_ref_storage<T&&>{std::addressof(t)};
             }
 
+            // A copy of a bit-field of an lvalue, which is passed to a visitor as an lvalue. If the object is not
+            // const, the copy is assigned to the bit-field on destruction unless they are equal, so that a visitor
+            // that only reads the field does not write to the object.
+            template <typename U, std::size_t N, typename T>
+            struct bit_field_copy
+            {
+                using bit_field_copy_tag = void;
+                using M = std::remove_cv_t<typename[:meta::type_of(member_at<U, N>):]>;
+
+                T* ptr;
+                M value;
+
+                constexpr bit_field_copy(T& t) noexcept : ptr(std::addressof(t)), value(get_member<U, N>(t)) {}
+                bit_field_copy(const bit_field_copy&) = delete;
+                bit_field_copy& operator=(const bit_field_copy&) = delete;
+
+                constexpr ~bit_field_copy()
+                {
+                    if constexpr (!std::is_const_v<T>)
+                    {
+                        if (get_member<U, N>(*ptr) != value) set_member<U, N>(*ptr, value);
+                    }
+                }
+
+                constexpr auto& get() noexcept
+                {
+                    if constexpr (std::is_const_v<T>)
+                    {
+                        return std::as_const(value);
+                    }
+                    else
+                    {
+                        return value;
+                    }
+                }
+            };
+
             template <std::size_t N, typename T>
             constexpr decltype(auto) get_stored_field(field_ref_storage<T>& storage) noexcept
             {
                 using U = std::remove_cvref_t<T>;
-                if constexpr (std::is_rvalue_reference_v<T>)
+                if constexpr (!std::is_rvalue_reference_v<T> && meta::is_bit_field(member_at<U, N>))
+                {
+                    return bit_field_copy<U, N, std::remove_reference_t<T>>(*storage.ptr);
+                }
+                else if constexpr (std::is_rvalue_reference_v<T>)
                 {
                     return forward_member<U, N>(std::move(*storage.ptr));
                 }
@@ -2014,15 +2055,32 @@ namespace field_reflection
             template <typename R, bool Pred>
             concept visitor_result = !Pred || requires(R&& r) { static_cast<bool>(std::forward<R>(r)); };
 
+            template <typename R>
+            concept bit_field_copy_of = requires { typename std::remove_cvref_t<R>::bit_field_copy_tag; };
+
+            // The argument of a visitor for the field returned by get_stored_field, which is the copy for a bit-field
+            template <typename R>
+            constexpr decltype(auto) field_arg(R&& r) noexcept
+            {
+                if constexpr (bit_field_copy_of<R>)
+                {
+                    return r.get();
+                }
+                else
+                {
+                    return std::forward<R>(r);
+                }
+            }
+
             template <bool Pred, std::size_t I, typename Func, typename... S>
             concept field_visitor = requires(Func& func, S&... storage) {
-                { func(get_stored_field<I>(storage)...) } -> visitor_result<Pred>;
+                { func(field_arg(get_stored_field<I>(storage))...) } -> visitor_result<Pred>;
             };
 
             template <bool Pred, std::size_t I, typename U, reflect_options O, typename Func, typename... S>
             concept named_field_visitor = requires(Func& func, S&... storage) {
                 {
-                    func(field_reflection::field_name<U, I, O>, get_stored_field<I>(storage)...)
+                    func(field_reflection::field_name<U, I, O>, field_arg(get_stored_field<I>(storage))...)
                 } -> visitor_result<Pred>;
             };
 
@@ -2062,109 +2120,92 @@ namespace field_reflection
             constexpr visitor_kind visitor_kind_v = get_visitor_kind<O, Pred, Func, T, Ts...>(
                 std::make_index_sequence<field_reflection::field_count<std::remove_cvref_t<T>, O>>());
 
+            // Calls func with the I-th fields. The copies of bit-fields are destroyed, and written back, when func
+            // returns, before the next field is visited.
+            template <std::size_t I, reflect_options O, bool Pred, typename U, visitor_kind K, typename Func,
+                      typename... S>
+            constexpr auto visit_field(Func& func, S&... storage)
+            {
+                if constexpr (K == visitor_kind::fields)
+                {
+                    if constexpr (Pred)
+                    {
+                        return static_cast<bool>(func(field_arg(get_stored_field<I>(storage))...));
+                    }
+                    else
+                    {
+                        func(field_arg(get_stored_field<I>(storage))...);
+                    }
+                }
+                else
+                {
+                    if constexpr (Pred)
+                    {
+                        return static_cast<bool>(
+                            func(field_reflection::field_name<U, I, O>, field_arg(get_stored_field<I>(storage))...));
+                    }
+                    else
+                    {
+                        func(field_reflection::field_name<U, I, O>, field_arg(get_stored_field<I>(storage))...);
+                    }
+                }
+            }
+
             template <reflect_options O, typename T, typename Func, std::size_t... Is>
             constexpr void for_each_field_impl(T&& t, Func&& func, std::index_sequence<Is...>)
             {
                 using U = std::remove_cvref_t<T>;
+                constexpr auto kind = visitor_kind_v<O, false, Func, T>;
                 auto storage = make_field_storage<O>(std::forward<T>(t));
-                if constexpr (visitor_kind_v<O, false, Func, T> == visitor_kind::fields)
-                {
-                    (func(get_stored_field<Is>(storage)), ...);
-                }
-                else
-                {
-                    (func(field_reflection::field_name<U, Is, O>, get_stored_field<Is>(storage)), ...);
-                }
+                (visit_field<Is, O, false, U, kind>(func, storage), ...);
             }
 
             template <reflect_options O, typename T1, typename T2, typename Func, std::size_t... Is>
             constexpr void for_each_field_impl(T1&& t1, T2&& t2, Func&& func, std::index_sequence<Is...>)
             {
                 using U = std::remove_cvref_t<T1>;
+                constexpr auto kind = visitor_kind_v<O, false, Func, T1, T2>;
                 auto storage1 = make_field_storage<O>(std::forward<T1>(t1));
                 auto storage2 = make_field_storage<O>(std::forward<T2>(t2));
-                if constexpr (visitor_kind_v<O, false, Func, T1, T2> == visitor_kind::fields)
-                {
-                    (func(get_stored_field<Is>(storage1), get_stored_field<Is>(storage2)), ...);
-                }
-                else
-                {
-                    (func(field_reflection::field_name<U, Is, O>, get_stored_field<Is>(storage1),
-                          get_stored_field<Is>(storage2)),
-                     ...);
-                }
+                (visit_field<Is, O, false, U, kind>(func, storage1, storage2), ...);
             }
 
             template <reflect_options O, typename T, typename Func, std::size_t... Is>
             constexpr bool all_of_field_impl(T&& t, Func&& func, std::index_sequence<Is...>)
             {
                 using U = std::remove_cvref_t<T>;
+                constexpr auto kind = visitor_kind_v<O, true, Func, T>;
                 auto storage = make_field_storage<O>(std::forward<T>(t));
-                if constexpr (visitor_kind_v<O, true, Func, T> == visitor_kind::fields)
-                {
-                    return (static_cast<bool>(func(get_stored_field<Is>(storage))) && ...);
-                }
-                else
-                {
-                    return (static_cast<bool>(
-                                func(field_reflection::field_name<U, Is, O>, get_stored_field<Is>(storage))) &&
-                            ...);
-                }
+                return (visit_field<Is, O, true, U, kind>(func, storage) && ...);
             }
 
             template <reflect_options O, typename T1, typename T2, typename Func, std::size_t... Is>
             constexpr bool all_of_field_impl(T1&& t1, T2&& t2, Func&& func, std::index_sequence<Is...>)
             {
                 using U = std::remove_cvref_t<T1>;
+                constexpr auto kind = visitor_kind_v<O, true, Func, T1, T2>;
                 auto storage1 = make_field_storage<O>(std::forward<T1>(t1));
                 auto storage2 = make_field_storage<O>(std::forward<T2>(t2));
-                if constexpr (visitor_kind_v<O, true, Func, T1, T2> == visitor_kind::fields)
-                {
-                    return (static_cast<bool>(func(get_stored_field<Is>(storage1), get_stored_field<Is>(storage2))) &&
-                            ...);
-                }
-                else
-                {
-                    return (static_cast<bool>(func(field_reflection::field_name<U, Is, O>,
-                                                   get_stored_field<Is>(storage1), get_stored_field<Is>(storage2))) &&
-                            ...);
-                }
+                return (visit_field<Is, O, true, U, kind>(func, storage1, storage2) && ...);
             }
 
             template <reflect_options O, typename T, typename Func, std::size_t... Is>
             constexpr bool any_of_field_impl(T&& t, Func&& func, std::index_sequence<Is...>)
             {
                 using U = std::remove_cvref_t<T>;
+                constexpr auto kind = visitor_kind_v<O, true, Func, T>;
                 auto storage = make_field_storage<O>(std::forward<T>(t));
-                if constexpr (visitor_kind_v<O, true, Func, T> == visitor_kind::fields)
-                {
-                    return (static_cast<bool>(func(get_stored_field<Is>(storage))) || ...);
-                }
-                else
-                {
-                    return (static_cast<bool>(
-                                func(field_reflection::field_name<U, Is, O>, get_stored_field<Is>(storage))) ||
-                            ...);
-                }
+                return (visit_field<Is, O, true, U, kind>(func, storage) || ...);
             }
 
             template <reflect_options O, typename T1, typename T2, typename Func, std::size_t... Is>
             constexpr bool any_of_field_impl(T1&& t1, T2&& t2, Func&& func, std::index_sequence<Is...>)
             {
                 using U = std::remove_cvref_t<T1>;
+                constexpr auto kind = visitor_kind_v<O, true, Func, T1, T2>;
                 auto storage1 = make_field_storage<O>(std::forward<T1>(t1));
                 auto storage2 = make_field_storage<O>(std::forward<T2>(t2));
-                if constexpr (visitor_kind_v<O, true, Func, T1, T2> == visitor_kind::fields)
-                {
-                    return (static_cast<bool>(func(get_stored_field<Is>(storage1), get_stored_field<Is>(storage2))) ||
-                            ...);
-                }
-                else
-                {
-                    return (static_cast<bool>(func(field_reflection::field_name<U, Is, O>,
-                                                   get_stored_field<Is>(storage1), get_stored_field<Is>(storage2))) ||
-                            ...);
-                }
+                return (visit_field<Is, O, true, U, kind>(func, storage1, storage2) || ...);
             }
         }  // namespace detail
 
