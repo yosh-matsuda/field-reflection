@@ -89,12 +89,6 @@ namespace std_rfl_test
     {
     };
 
-    struct array_member
-    {
-        int a[3];
-        int b;
-    };
-
     struct anonymous_union
     {
         int tag;
@@ -221,19 +215,6 @@ TEST(std_reflection, base_classes)
     // rvalue
     auto moved = get_field<3>(std::move(d));
     EXPECT_EQ(moved, "four");
-}
-
-TEST(std_reflection, array_member)
-{
-    static_assert(field_namable<array_member>);
-    static_assert(field_count<array_member> == 2);
-    static_assert(std::is_same_v<field_type<array_member, 0>, int[3]>);
-    static_assert(field_name<array_member, 0> == "a");
-
-    array_member a{{1, 2, 3}, 4};
-    static_assert(std::is_same_v<decltype(get_field<0>(a)), int (&)[3]>);
-    EXPECT_EQ(get_field<0>(a)[2], 3);
-    EXPECT_EQ(get_field<1>(a), 4);
 }
 
 TEST(std_reflection, anonymous_union)

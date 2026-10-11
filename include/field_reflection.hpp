@@ -268,9 +268,85 @@ namespace field_reflection
                 }
             }();
 
+            // T{arg x L, {arg x S}, arg x R}
+            template <typename T, std::size_t L, std::size_t S, std::size_t R>
+            concept constructible_with_nested =
+                []<std::size_t... Ls, std::size_t... Ss, std::size_t... Rs>(
+                    std::index_sequence<Ls...>, std::index_sequence<Ss...>, std::index_sequence<Rs...>) {
+                    if constexpr (std::is_copy_constructible_v<T>)
+                    {
+                        return requires { T{any_lref<T, Ls>()..., {any_lref<T, Ss>()...}, any_lref<T, Rs>()...}; };
+                    }
+                    else
+                    {
+                        return requires { T{any_rref<T, Ls>()..., {any_rref<T, Ss>()...}, any_rref<T, Rs>()...}; };
+                    }
+                }(std::make_index_sequence<L>(), std::make_index_sequence<S>(), std::make_index_sequence<R>());
+
+            // The number of initializers that the member initialized by the L-th of Max initializers takes, i.e.,
+            // the number of elements if the member is a C array, which takes them by brace elision, and 1
+            // otherwise. It is the S with which the rest of the members take exactly the rest of the initializers
+            // when the member is initialized by S initializers in braces.
+            template <typename T, std::size_t L, std::size_t Max, std::size_t S = 2>
+            constexpr std::size_t member_width = []() {
+                if constexpr (S > Max - L)
+                {
+                    return std::size_t{1};
+                }
+                else if constexpr (constructible_with_nested<T, L, S, Max - L - S> &&
+                                   !constructible_with_nested<T, L, S, Max - L - S + 1>)
+                {
+                    return S;
+                }
+                else
+                {
+                    return member_width<T, L, Max, S + 1>;
+                }
+            }();
+
+            template <typename T, std::size_t L, std::size_t Max>
+            constexpr std::size_t member_count_from = []() {
+                if constexpr (L >= Max)
+                {
+                    return std::size_t{0};
+                }
+                // Fast paths for a member that is not a C array: `{}` or `{arg}` initializes it, and the rest of
+                // the members take the rest of the initializers.
+                else if constexpr (constructible_with_nested<T, L, 0, Max - L - 1> ||
+                                   constructible_with_nested<T, L, 1, Max - L - 1>)
+                {
+                    return 1 + member_count_from<T, L + 1, Max>;
+                }
+                else
+                {
+                    return 1 + member_count_from<T, L + member_width<T, L, Max>, Max>;
+                }
+            }();
+
+            // The number of initializers of aggregate initialization counts the elements of C array members.
+            // Count such a member as one field unless T has a base class, whose fields are counted in the same
+            // way as by brace elision.
             template <typename T>
             requires std::is_aggregate_v<T>
-            constexpr std::size_t field_count_value = field_count_impl<T, 0>;
+            constexpr std::size_t field_count_value = []() {
+                constexpr auto max_args = field_count_impl<T, 0>;
+                if constexpr (max_args == std::numeric_limits<std::size_t>::max() || has_base<T>)
+                {
+                    return max_args;
+                }
+                // Fast path: a braced list initializes exactly one member without brace elision, so T has no C
+                // array members if each of the initializers in braces initializes T.
+                else if constexpr ([]<std::size_t... Is>(std::index_sequence<Is...>) {
+                                       return requires { T{{any_rref<T, Is>()}...}; };
+                                   }(std::make_index_sequence<max_args>()))
+                {
+                    return max_args;
+                }
+                else
+                {
+                    return member_count_from<T, 0, max_args>;
+                }
+            }();
 
             template <typename T>
             concept field_countable = std::is_class_v<T> && (!tuple_like<T>) && std::is_aggregate_v<T> &&
@@ -815,37 +891,55 @@ namespace field_reflection
             template <field_referenceable T, std::size_t N>
             using field_type = std::tuple_element_t<N, typename decltype(field_type_tuple<T>())::type>;
 
-            template <typename Tuple, bool Move>
+            // Forwards the member of an object that is an rvalue from the pointer to it.
+            template <typename U, std::size_t N, typename P>
+            constexpr decltype(auto) forward_member(P* ptr) noexcept
+            {
+                if constexpr (std::is_lvalue_reference_v<field_type<U, N>>)
+                {
+                    return *ptr;
+                }
+                else
+                {
+                    return std::move(*ptr);
+                }
+            }
+
+            template <typename Tuple>
             struct field_storage
             {
                 Tuple fields;
             };
 
+            template <typename U, typename Tuple>
+            struct field_move_storage
+            {
+                Tuple fields;
+            };
+
             template <reflect_options, typename T>
-            constexpr auto make_field_storage(T&& t)
+            constexpr auto make_field_storage(T&& t) noexcept
             {
                 if constexpr (std::is_rvalue_reference_v<T&&>)
                 {
-                    return field_storage<decltype(to_tuple_impl(std::forward<T>(t))), true>{
-                        to_tuple_impl(std::forward<T>(t))};
+                    return field_move_storage<std::remove_cvref_t<T>, decltype(to_ptr_tuple(t))>{to_ptr_tuple(t)};
                 }
                 else
                 {
-                    return field_storage<decltype(to_ptr_tuple(t)), false>{to_ptr_tuple(t)};
+                    return field_storage<decltype(to_ptr_tuple(t))>{to_ptr_tuple(t)};
                 }
             }
 
-            template <std::size_t N, typename Tuple, bool Move>
-            constexpr decltype(auto) get_stored_field(field_storage<Tuple, Move>& storage) noexcept
+            template <std::size_t N, typename Tuple>
+            constexpr decltype(auto) get_stored_field(field_storage<Tuple>& storage) noexcept
             {
-                if constexpr (Move)
-                {
-                    return std::get<N>(std::move(storage.fields));
-                }
-                else
-                {
-                    return *std::get<N>(storage.fields);
-                }
+                return *std::get<N>(storage.fields);
+            }
+
+            template <std::size_t N, typename U, typename Tuple>
+            constexpr decltype(auto) get_stored_field(field_move_storage<U, Tuple>& storage) noexcept
+            {
+                return forward_member<U, N>(std::get<N>(storage.fields));
             }
 
             template <auto V>
@@ -984,7 +1078,9 @@ namespace field_reflection
         requires std::is_rvalue_reference_v<T&&>
         constexpr auto get_field(T&& t) noexcept
         {
-            return std::get<N>(detail::to_tuple_impl(std::forward<T>(t)));
+            static_assert(!std::is_array_v<std::remove_reference_t<field_type<U, N, O>>>,
+                          "get_field cannot return an array member of an rvalue by value");
+            return detail::forward_member<U, N>(std::get<N>(detail::to_ptr_tuple(t)));
         }
 
         template <std::size_t N, reflect_options O, typename T, typename V,
@@ -997,6 +1093,10 @@ namespace field_reflection
         template <reflect_options O, typename T, field_referenceable<O> U = std::remove_cvref_t<T>>
         constexpr auto to_tuple(T&& t)
         {
+            []<std::size_t... Is>(std::index_sequence<Is...>) {
+                static_assert((!std::is_array_v<field_type<U, Is, O>> && ...),
+                              "to_tuple does not support C array members");
+            }(std::make_index_sequence<field_count<U, O>>());
             return detail::to_tuple_impl(std::forward<T>(t));
         }
 #else

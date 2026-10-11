@@ -820,4 +820,50 @@ TEST(field_reflection, explicit_template_arguments)
     for_each_field<opts>(s, [&](auto&) { ++count; });
     EXPECT_EQ(count, 2 * field_count<my_struct1>);
 }
+struct array_members
+{
+    int a[3];
+    int b;
+    char s[4][2];
+    std::string strs[2];
+};
+struct nested_array_members
+{
+    array_members m;
+    my_struct15 e;
+    double d[1];
+    std::unique_ptr<int> p[2];
+};
+TEST(field_reflection, c_array_members)
+{
+    static_assert(field_namable<array_members>);
+    static_assert(field_count<array_members> == 4);
+    static_assert(std::is_same_v<field_type<array_members, 0>, int[3]>);
+    static_assert(std::is_same_v<field_type<array_members, 2>, char[4][2]>);
+    static_assert(field_name<array_members, 0> == "a");
+    static_assert(field_name<array_members, 3> == "strs");
+    static_assert(field_namable<nested_array_members>);
+    static_assert(field_count<nested_array_members> == 4);
+    static_assert(std::is_same_v<field_type<nested_array_members, 3>, std::unique_ptr<int>[2]>);
+
+    auto a = array_members{{1, 2, 3}, 4, {{'a', 'b'}}, {"x", "y"}};
+    static_assert(std::is_same_v<decltype(get_field<0>(a)), int (&)[3]>);
+    EXPECT_EQ(get_field<0>(a)[2], 3);
+    EXPECT_EQ(get_field<1>(a), 4);
+    EXPECT_EQ(get_field<2>(a)[0][1], 'b');
+    EXPECT_EQ(get_field<1>(std::move(a)), 4);
+
+    auto n = nested_array_members{};
+    n.p[1] = std::make_unique<int>(5);
+    std::unique_ptr<int> moved;
+    for_each_field(std::move(n), [&](std::string_view name, auto&& field) {
+        if constexpr (std::is_same_v<std::remove_cvref_t<decltype(field)>, std::unique_ptr<int>[2]>)
+        {
+            static_assert(std::is_rvalue_reference_v<decltype(field)>);
+            EXPECT_EQ(name, "p");
+            moved = std::move(field[1]);
+        }
+    });
+    EXPECT_EQ(*moved, 5);
+}
 // NOLINTEND
