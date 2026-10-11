@@ -13,8 +13,14 @@
 #include <version>
 
 // C++26 static reflection (P2996) backend is enabled automatically when the compiler supports it.
-// Define FIELD_RFL_DISABLE_STD_REFLECTION to keep using the C++20 backend.
-#if !defined(FIELD_RFL_DISABLE_STD_REFLECTION) && defined(__cpp_impl_reflection) && defined(__cpp_lib_reflection)
+// Define FIELD_RFL_DISABLE_STD_REFLECTION (empty or nonzero) to keep using the C++20 backend.
+#if defined(FIELD_RFL_STD_REFLECTION)
+#error "FIELD_RFL_STD_REFLECTION is defined by field_reflection.hpp; define FIELD_RFL_DISABLE_STD_REFLECTION instead"
+#endif
+#if defined(FIELD_RFL_DISABLE_STD_REFLECTION) && \
+    ((FIELD_RFL_DISABLE_STD_REFLECTION + 0) || (1 - FIELD_RFL_DISABLE_STD_REFLECTION - 1 == 2))
+#define FIELD_RFL_STD_REFLECTION 0
+#elif defined(__cpp_impl_reflection) && defined(__cpp_lib_reflection)
 #define FIELD_RFL_STD_REFLECTION 1
 #else
 #define FIELD_RFL_STD_REFLECTION 0
