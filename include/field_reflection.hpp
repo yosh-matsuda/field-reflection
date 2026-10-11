@@ -560,435 +560,272 @@ namespace field_reflection
 #if defined(_MSC_VER)
 #pragma region TO_TUPLE_TEMPLATE_MACRO
 #endif
-// map macro: https://github.com/swansontec/map-macro
-#define FIELD_RFL_EVAL0(...) __VA_ARGS__
-#define FIELD_RFL_EVAL1(...) FIELD_RFL_EVAL0(FIELD_RFL_EVAL0(FIELD_RFL_EVAL0(__VA_ARGS__)))
-#define FIELD_RFL_EVAL2(...) FIELD_RFL_EVAL1(FIELD_RFL_EVAL1(FIELD_RFL_EVAL1(__VA_ARGS__)))
-#define FIELD_RFL_EVAL3(...) FIELD_RFL_EVAL2(FIELD_RFL_EVAL2(FIELD_RFL_EVAL2(__VA_ARGS__)))
-#define FIELD_RFL_EVAL4(...) FIELD_RFL_EVAL3(FIELD_RFL_EVAL3(FIELD_RFL_EVAL3(__VA_ARGS__)))
-#define FIELD_RFL_EVAL(...) FIELD_RFL_EVAL4(FIELD_RFL_EVAL4(FIELD_RFL_EVAL4(__VA_ARGS__)))
+// FIELD_RFL_SEQ<N>(f) expands to f(p0), f(p1), ..., f(p<N-1>). Each macro expands the previous one, which is much
+// faster to preprocess than a recursive map macro.
+#define FIELD_RFL_SEQ1(f) f(p0)
+#define FIELD_RFL_SEQ2(f) FIELD_RFL_SEQ1(f), f(p1)
+#define FIELD_RFL_SEQ3(f) FIELD_RFL_SEQ2(f), f(p2)
+#define FIELD_RFL_SEQ4(f) FIELD_RFL_SEQ3(f), f(p3)
+#define FIELD_RFL_SEQ5(f) FIELD_RFL_SEQ4(f), f(p4)
+#define FIELD_RFL_SEQ6(f) FIELD_RFL_SEQ5(f), f(p5)
+#define FIELD_RFL_SEQ7(f) FIELD_RFL_SEQ6(f), f(p6)
+#define FIELD_RFL_SEQ8(f) FIELD_RFL_SEQ7(f), f(p7)
+#define FIELD_RFL_SEQ9(f) FIELD_RFL_SEQ8(f), f(p8)
+#define FIELD_RFL_SEQ10(f) FIELD_RFL_SEQ9(f), f(p9)
+#define FIELD_RFL_SEQ11(f) FIELD_RFL_SEQ10(f), f(p10)
+#define FIELD_RFL_SEQ12(f) FIELD_RFL_SEQ11(f), f(p11)
+#define FIELD_RFL_SEQ13(f) FIELD_RFL_SEQ12(f), f(p12)
+#define FIELD_RFL_SEQ14(f) FIELD_RFL_SEQ13(f), f(p13)
+#define FIELD_RFL_SEQ15(f) FIELD_RFL_SEQ14(f), f(p14)
+#define FIELD_RFL_SEQ16(f) FIELD_RFL_SEQ15(f), f(p15)
+#define FIELD_RFL_SEQ17(f) FIELD_RFL_SEQ16(f), f(p16)
+#define FIELD_RFL_SEQ18(f) FIELD_RFL_SEQ17(f), f(p17)
+#define FIELD_RFL_SEQ19(f) FIELD_RFL_SEQ18(f), f(p18)
+#define FIELD_RFL_SEQ20(f) FIELD_RFL_SEQ19(f), f(p19)
+#define FIELD_RFL_SEQ21(f) FIELD_RFL_SEQ20(f), f(p20)
+#define FIELD_RFL_SEQ22(f) FIELD_RFL_SEQ21(f), f(p21)
+#define FIELD_RFL_SEQ23(f) FIELD_RFL_SEQ22(f), f(p22)
+#define FIELD_RFL_SEQ24(f) FIELD_RFL_SEQ23(f), f(p23)
+#define FIELD_RFL_SEQ25(f) FIELD_RFL_SEQ24(f), f(p24)
+#define FIELD_RFL_SEQ26(f) FIELD_RFL_SEQ25(f), f(p25)
+#define FIELD_RFL_SEQ27(f) FIELD_RFL_SEQ26(f), f(p26)
+#define FIELD_RFL_SEQ28(f) FIELD_RFL_SEQ27(f), f(p27)
+#define FIELD_RFL_SEQ29(f) FIELD_RFL_SEQ28(f), f(p28)
+#define FIELD_RFL_SEQ30(f) FIELD_RFL_SEQ29(f), f(p29)
+#define FIELD_RFL_SEQ31(f) FIELD_RFL_SEQ30(f), f(p30)
+#define FIELD_RFL_SEQ32(f) FIELD_RFL_SEQ31(f), f(p31)
+#define FIELD_RFL_SEQ33(f) FIELD_RFL_SEQ32(f), f(p32)
+#define FIELD_RFL_SEQ34(f) FIELD_RFL_SEQ33(f), f(p33)
+#define FIELD_RFL_SEQ35(f) FIELD_RFL_SEQ34(f), f(p34)
+#define FIELD_RFL_SEQ36(f) FIELD_RFL_SEQ35(f), f(p35)
+#define FIELD_RFL_SEQ37(f) FIELD_RFL_SEQ36(f), f(p36)
+#define FIELD_RFL_SEQ38(f) FIELD_RFL_SEQ37(f), f(p37)
+#define FIELD_RFL_SEQ39(f) FIELD_RFL_SEQ38(f), f(p38)
+#define FIELD_RFL_SEQ40(f) FIELD_RFL_SEQ39(f), f(p39)
+#define FIELD_RFL_SEQ41(f) FIELD_RFL_SEQ40(f), f(p40)
+#define FIELD_RFL_SEQ42(f) FIELD_RFL_SEQ41(f), f(p41)
+#define FIELD_RFL_SEQ43(f) FIELD_RFL_SEQ42(f), f(p42)
+#define FIELD_RFL_SEQ44(f) FIELD_RFL_SEQ43(f), f(p43)
+#define FIELD_RFL_SEQ45(f) FIELD_RFL_SEQ44(f), f(p44)
+#define FIELD_RFL_SEQ46(f) FIELD_RFL_SEQ45(f), f(p45)
+#define FIELD_RFL_SEQ47(f) FIELD_RFL_SEQ46(f), f(p46)
+#define FIELD_RFL_SEQ48(f) FIELD_RFL_SEQ47(f), f(p47)
+#define FIELD_RFL_SEQ49(f) FIELD_RFL_SEQ48(f), f(p48)
+#define FIELD_RFL_SEQ50(f) FIELD_RFL_SEQ49(f), f(p49)
+#define FIELD_RFL_SEQ51(f) FIELD_RFL_SEQ50(f), f(p50)
+#define FIELD_RFL_SEQ52(f) FIELD_RFL_SEQ51(f), f(p51)
+#define FIELD_RFL_SEQ53(f) FIELD_RFL_SEQ52(f), f(p52)
+#define FIELD_RFL_SEQ54(f) FIELD_RFL_SEQ53(f), f(p53)
+#define FIELD_RFL_SEQ55(f) FIELD_RFL_SEQ54(f), f(p54)
+#define FIELD_RFL_SEQ56(f) FIELD_RFL_SEQ55(f), f(p55)
+#define FIELD_RFL_SEQ57(f) FIELD_RFL_SEQ56(f), f(p56)
+#define FIELD_RFL_SEQ58(f) FIELD_RFL_SEQ57(f), f(p57)
+#define FIELD_RFL_SEQ59(f) FIELD_RFL_SEQ58(f), f(p58)
+#define FIELD_RFL_SEQ60(f) FIELD_RFL_SEQ59(f), f(p59)
+#define FIELD_RFL_SEQ61(f) FIELD_RFL_SEQ60(f), f(p60)
+#define FIELD_RFL_SEQ62(f) FIELD_RFL_SEQ61(f), f(p61)
+#define FIELD_RFL_SEQ63(f) FIELD_RFL_SEQ62(f), f(p62)
+#define FIELD_RFL_SEQ64(f) FIELD_RFL_SEQ63(f), f(p63)
+#define FIELD_RFL_SEQ65(f) FIELD_RFL_SEQ64(f), f(p64)
+#define FIELD_RFL_SEQ66(f) FIELD_RFL_SEQ65(f), f(p65)
+#define FIELD_RFL_SEQ67(f) FIELD_RFL_SEQ66(f), f(p66)
+#define FIELD_RFL_SEQ68(f) FIELD_RFL_SEQ67(f), f(p67)
+#define FIELD_RFL_SEQ69(f) FIELD_RFL_SEQ68(f), f(p68)
+#define FIELD_RFL_SEQ70(f) FIELD_RFL_SEQ69(f), f(p69)
+#define FIELD_RFL_SEQ71(f) FIELD_RFL_SEQ70(f), f(p70)
+#define FIELD_RFL_SEQ72(f) FIELD_RFL_SEQ71(f), f(p71)
+#define FIELD_RFL_SEQ73(f) FIELD_RFL_SEQ72(f), f(p72)
+#define FIELD_RFL_SEQ74(f) FIELD_RFL_SEQ73(f), f(p73)
+#define FIELD_RFL_SEQ75(f) FIELD_RFL_SEQ74(f), f(p74)
+#define FIELD_RFL_SEQ76(f) FIELD_RFL_SEQ75(f), f(p75)
+#define FIELD_RFL_SEQ77(f) FIELD_RFL_SEQ76(f), f(p76)
+#define FIELD_RFL_SEQ78(f) FIELD_RFL_SEQ77(f), f(p77)
+#define FIELD_RFL_SEQ79(f) FIELD_RFL_SEQ78(f), f(p78)
+#define FIELD_RFL_SEQ80(f) FIELD_RFL_SEQ79(f), f(p79)
+#define FIELD_RFL_SEQ81(f) FIELD_RFL_SEQ80(f), f(p80)
+#define FIELD_RFL_SEQ82(f) FIELD_RFL_SEQ81(f), f(p81)
+#define FIELD_RFL_SEQ83(f) FIELD_RFL_SEQ82(f), f(p82)
+#define FIELD_RFL_SEQ84(f) FIELD_RFL_SEQ83(f), f(p83)
+#define FIELD_RFL_SEQ85(f) FIELD_RFL_SEQ84(f), f(p84)
+#define FIELD_RFL_SEQ86(f) FIELD_RFL_SEQ85(f), f(p85)
+#define FIELD_RFL_SEQ87(f) FIELD_RFL_SEQ86(f), f(p86)
+#define FIELD_RFL_SEQ88(f) FIELD_RFL_SEQ87(f), f(p87)
+#define FIELD_RFL_SEQ89(f) FIELD_RFL_SEQ88(f), f(p88)
+#define FIELD_RFL_SEQ90(f) FIELD_RFL_SEQ89(f), f(p89)
+#define FIELD_RFL_SEQ91(f) FIELD_RFL_SEQ90(f), f(p90)
+#define FIELD_RFL_SEQ92(f) FIELD_RFL_SEQ91(f), f(p91)
+#define FIELD_RFL_SEQ93(f) FIELD_RFL_SEQ92(f), f(p92)
+#define FIELD_RFL_SEQ94(f) FIELD_RFL_SEQ93(f), f(p93)
+#define FIELD_RFL_SEQ95(f) FIELD_RFL_SEQ94(f), f(p94)
+#define FIELD_RFL_SEQ96(f) FIELD_RFL_SEQ95(f), f(p95)
+#define FIELD_RFL_SEQ97(f) FIELD_RFL_SEQ96(f), f(p96)
+#define FIELD_RFL_SEQ98(f) FIELD_RFL_SEQ97(f), f(p97)
+#define FIELD_RFL_SEQ99(f) FIELD_RFL_SEQ98(f), f(p98)
+#define FIELD_RFL_SEQ100(f) FIELD_RFL_SEQ99(f), f(p99)
 
-#define FIELD_RFL_MAP_END(...)
-#define FIELD_RFL_MAP_OUT
-#define FIELD_RFL_MAP_COMMA ,
-
-#define FIELD_RFL_MAP_GET_END2() 0, FIELD_RFL_MAP_END
-#define FIELD_RFL_MAP_GET_END1(...) FIELD_RFL_MAP_GET_END2
-#define FIELD_RFL_MAP_GET_END(...) FIELD_RFL_MAP_GET_END1
-#define FIELD_RFL_MAP_NEXT0(test, next, ...) next FIELD_RFL_MAP_OUT
-#define FIELD_RFL_MAP_NEXT1(test, next) FIELD_RFL_MAP_NEXT0(test, next, 0)
-#define FIELD_RFL_MAP_NEXT(test, next) FIELD_RFL_MAP_NEXT1(FIELD_RFL_MAP_GET_END test, next)
-
-#define FIELD_RFL_MAP0(f, x, peek, ...) f(x) FIELD_RFL_MAP_NEXT(peek, FIELD_RFL_MAP1)(f, peek, __VA_ARGS__)
-#define FIELD_RFL_MAP1(f, x, peek, ...) f(x) FIELD_RFL_MAP_NEXT(peek, FIELD_RFL_MAP0)(f, peek, __VA_ARGS__)
-
-#define FIELD_RFL_MAP_LIST_NEXT1(test, next) FIELD_RFL_MAP_NEXT0(test, FIELD_RFL_MAP_COMMA next, 0)
-#define FIELD_RFL_MAP_LIST_NEXT(test, next) FIELD_RFL_MAP_LIST_NEXT1(FIELD_RFL_MAP_GET_END test, next)
-
-#define FIELD_RFL_MAP_LIST0(f, x, peek, ...) \
-    f(x) FIELD_RFL_MAP_LIST_NEXT(peek, FIELD_RFL_MAP_LIST1)(f, peek, __VA_ARGS__)
-#define FIELD_RFL_MAP_LIST1(f, x, peek, ...) \
-    f(x) FIELD_RFL_MAP_LIST_NEXT(peek, FIELD_RFL_MAP_LIST0)(f, peek, __VA_ARGS__)
-#define FIELD_RFL_MAP(f, ...) FIELD_RFL_EVAL(FIELD_RFL_MAP1(f, __VA_ARGS__, ()()(), ()()(), ()()(), 0))
-#define FIELD_RFL_MAP_LIST(f, ...) FIELD_RFL_EVAL(FIELD_RFL_MAP_LIST1(f, __VA_ARGS__, ()()(), ()()(), ()()(), 0))
-
+#define FIELD_RFL_ID(x) x
 #define FIELD_RFL_ADDR(x) &x
-#define FIELD_RFL_NOT_BIT_FIELD(x) sizeof(x);
+#define FIELD_RFL_DECLTYPE(x) decltype(x)
+#define FIELD_RFL_FORWARD(x) std::forward<decltype(x)>(x)
+#define FIELD_RFL_SIZEOF(x) sizeof(x)
 // Clang 15 and earlier do not allow structured bindings in requires-expressions.
 #if defined(__clang__) && __clang_major__ < (defined(__apple_build_version__) ? 15 : 16)
 #define FIELD_RFL_NO_BIT_FIELDS(...) true
 #else
-#define FIELD_RFL_NO_BIT_FIELDS(...) requires { FIELD_RFL_MAP(FIELD_RFL_NOT_BIT_FIELD, __VA_ARGS__) }
+#define FIELD_RFL_NO_BIT_FIELDS(...) requires { __VA_ARGS__; }
 #endif
-#define FIELD_RFL_DECLTYPE(x) decltype(x)
-#define FIELD_RFL_FORWARD(x) std::forward<decltype(x)>(x)
-#define FIELD_RFL_FIELD_TYPE(x) decltype(x)
 
-#define TO_TUPLE_TEMPLATE(NUM, ...)                                                               \
-    template <typename T, field_referenceable U = std::remove_cvref_t<T>>                         \
-    requires (field_count<U> == NUM)                                                              \
-    constexpr auto to_ptr_tuple(T&& t)                                                            \
-    {                                                                                             \
-        auto& [__VA_ARGS__] = t;                                                                  \
-        return std::tuple(FIELD_RFL_MAP_LIST(FIELD_RFL_ADDR, __VA_ARGS__));                       \
-    }                                                                                             \
-    template <typename T, field_referenceable U = std::remove_cvref_t<T>>                         \
-    requires (field_count<U> == NUM)                                                              \
-    constexpr auto to_tuple_impl(T&& t)                                                           \
-    {                                                                                             \
-        auto [__VA_ARGS__] = std::forward<T>(t);                                                  \
-        return std::tuple<FIELD_RFL_MAP_LIST(FIELD_RFL_DECLTYPE, __VA_ARGS__)>(                   \
-            FIELD_RFL_MAP_LIST(FIELD_RFL_FORWARD, __VA_ARGS__));                                  \
-    }                                                                                             \
-    template <decomposable T>                                                                     \
-    requires (field_count<T> == NUM)                                                              \
-    constexpr auto field_type_tuple()                                                             \
-    {                                                                                             \
-        auto&& [__VA_ARGS__] = *field_type_source<T>;                                             \
-        return field_type_info<std::tuple<FIELD_RFL_MAP_LIST(FIELD_RFL_FIELD_TYPE, __VA_ARGS__)>, \
-                               FIELD_RFL_NO_BIT_FIELDS(__VA_ARGS__)>{};                           \
+#define TO_TUPLE_TEMPLATE(NUM)                                                                            \
+    template <typename T, field_referenceable U = std::remove_cvref_t<T>>                                 \
+    requires (field_count<U> == NUM)                                                                      \
+    constexpr auto to_ptr_tuple(T&& t)                                                                    \
+    {                                                                                                     \
+        auto& [FIELD_RFL_SEQ##NUM(FIELD_RFL_ID)] = t;                                                     \
+        return std::tuple(FIELD_RFL_SEQ##NUM(FIELD_RFL_ADDR));                                            \
+    }                                                                                                     \
+    template <typename T, field_referenceable U = std::remove_cvref_t<T>>                                 \
+    requires (field_count<U> == NUM)                                                                      \
+    constexpr auto to_tuple_impl(T&& t)                                                                   \
+    {                                                                                                     \
+        auto [FIELD_RFL_SEQ##NUM(FIELD_RFL_ID)] = std::forward<T>(t);                                     \
+        return std::tuple<FIELD_RFL_SEQ##NUM(FIELD_RFL_DECLTYPE)>(FIELD_RFL_SEQ##NUM(FIELD_RFL_FORWARD)); \
+    }                                                                                                     \
+    template <decomposable T>                                                                             \
+    requires (field_count<T> == NUM)                                                                      \
+    constexpr auto field_type_tuple()                                                                     \
+    {                                                                                                     \
+        auto&& [FIELD_RFL_SEQ##NUM(FIELD_RFL_ID)] = *field_type_source<T>;                                \
+        return field_type_info<std::tuple<FIELD_RFL_SEQ##NUM(FIELD_RFL_DECLTYPE)>,                        \
+                               FIELD_RFL_NO_BIT_FIELDS(FIELD_RFL_SEQ##NUM(FIELD_RFL_SIZEOF))>{};          \
     }
 
-            TO_TUPLE_TEMPLATE(1, p0)
-            TO_TUPLE_TEMPLATE(2, p0, p1)
-            TO_TUPLE_TEMPLATE(3, p0, p1, p2)
-            TO_TUPLE_TEMPLATE(4, p0, p1, p2, p3)
-            TO_TUPLE_TEMPLATE(5, p0, p1, p2, p3, p4)
-            TO_TUPLE_TEMPLATE(6, p0, p1, p2, p3, p4, p5)
-            TO_TUPLE_TEMPLATE(7, p0, p1, p2, p3, p4, p5, p6)
-            TO_TUPLE_TEMPLATE(8, p0, p1, p2, p3, p4, p5, p6, p7)
-            TO_TUPLE_TEMPLATE(9, p0, p1, p2, p3, p4, p5, p6, p7, p8)
-            TO_TUPLE_TEMPLATE(10, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9)
-            TO_TUPLE_TEMPLATE(11, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10)
-            TO_TUPLE_TEMPLATE(12, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11)
-            TO_TUPLE_TEMPLATE(13, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12)
-            TO_TUPLE_TEMPLATE(14, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13)
-            TO_TUPLE_TEMPLATE(15, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14)
-            TO_TUPLE_TEMPLATE(16, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15)
-            TO_TUPLE_TEMPLATE(17, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16)
-            TO_TUPLE_TEMPLATE(18, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17)
-            TO_TUPLE_TEMPLATE(19, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18)
-            TO_TUPLE_TEMPLATE(20, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19)
-            TO_TUPLE_TEMPLATE(21, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20)
-            TO_TUPLE_TEMPLATE(22, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21)
-            TO_TUPLE_TEMPLATE(23, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22)
-            TO_TUPLE_TEMPLATE(24, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23)
-            TO_TUPLE_TEMPLATE(25, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24)
-            TO_TUPLE_TEMPLATE(26, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25)
-            TO_TUPLE_TEMPLATE(27, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26)
-            TO_TUPLE_TEMPLATE(28, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27)
-            TO_TUPLE_TEMPLATE(29, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28)
-            TO_TUPLE_TEMPLATE(30, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29)
-            TO_TUPLE_TEMPLATE(31, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30)
-            TO_TUPLE_TEMPLATE(32, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31)
-            TO_TUPLE_TEMPLATE(33, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32)
-            TO_TUPLE_TEMPLATE(34, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33)
-            TO_TUPLE_TEMPLATE(35, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34)
-            TO_TUPLE_TEMPLATE(36, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35)
-            TO_TUPLE_TEMPLATE(37, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36)
-            TO_TUPLE_TEMPLATE(38, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37)
-            TO_TUPLE_TEMPLATE(39, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38)
-            TO_TUPLE_TEMPLATE(40, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39)
-            TO_TUPLE_TEMPLATE(41, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40)
-            TO_TUPLE_TEMPLATE(42, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41)
-            TO_TUPLE_TEMPLATE(43, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42)
-            TO_TUPLE_TEMPLATE(44, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43)
-            TO_TUPLE_TEMPLATE(45, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43, p44)
-            TO_TUPLE_TEMPLATE(46, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43, p44, p45)
-            TO_TUPLE_TEMPLATE(47, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43, p44, p45, p46)
-            TO_TUPLE_TEMPLATE(48, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43, p44, p45, p46, p47)
-            TO_TUPLE_TEMPLATE(49, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43, p44, p45, p46, p47, p48)
-            TO_TUPLE_TEMPLATE(50, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43, p44, p45, p46, p47, p48, p49)
-            TO_TUPLE_TEMPLATE(51, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43, p44, p45, p46, p47, p48, p49, p50)
-            TO_TUPLE_TEMPLATE(52, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43, p44, p45, p46, p47, p48, p49, p50, p51)
-            TO_TUPLE_TEMPLATE(53, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43, p44, p45, p46, p47, p48, p49, p50, p51, p52)
-            TO_TUPLE_TEMPLATE(54, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43, p44, p45, p46, p47, p48, p49, p50, p51, p52, p53)
-            TO_TUPLE_TEMPLATE(55, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43, p44, p45, p46, p47, p48, p49, p50, p51, p52, p53, p54)
-            TO_TUPLE_TEMPLATE(56, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43, p44, p45, p46, p47, p48, p49, p50, p51, p52, p53, p54,
-                              p55)
-            TO_TUPLE_TEMPLATE(57, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43, p44, p45, p46, p47, p48, p49, p50, p51, p52, p53, p54,
-                              p55, p56)
-            TO_TUPLE_TEMPLATE(58, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43, p44, p45, p46, p47, p48, p49, p50, p51, p52, p53, p54,
-                              p55, p56, p57)
-            TO_TUPLE_TEMPLATE(59, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43, p44, p45, p46, p47, p48, p49, p50, p51, p52, p53, p54,
-                              p55, p56, p57, p58)
-            TO_TUPLE_TEMPLATE(60, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43, p44, p45, p46, p47, p48, p49, p50, p51, p52, p53, p54,
-                              p55, p56, p57, p58, p59)
-            TO_TUPLE_TEMPLATE(61, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43, p44, p45, p46, p47, p48, p49, p50, p51, p52, p53, p54,
-                              p55, p56, p57, p58, p59, p60)
-            TO_TUPLE_TEMPLATE(62, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43, p44, p45, p46, p47, p48, p49, p50, p51, p52, p53, p54,
-                              p55, p56, p57, p58, p59, p60, p61)
-            TO_TUPLE_TEMPLATE(63, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43, p44, p45, p46, p47, p48, p49, p50, p51, p52, p53, p54,
-                              p55, p56, p57, p58, p59, p60, p61, p62)
-            TO_TUPLE_TEMPLATE(64, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43, p44, p45, p46, p47, p48, p49, p50, p51, p52, p53, p54,
-                              p55, p56, p57, p58, p59, p60, p61, p62, p63)
-            TO_TUPLE_TEMPLATE(65, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43, p44, p45, p46, p47, p48, p49, p50, p51, p52, p53, p54,
-                              p55, p56, p57, p58, p59, p60, p61, p62, p63, p64)
-            TO_TUPLE_TEMPLATE(66, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43, p44, p45, p46, p47, p48, p49, p50, p51, p52, p53, p54,
-                              p55, p56, p57, p58, p59, p60, p61, p62, p63, p64, p65)
-            TO_TUPLE_TEMPLATE(67, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43, p44, p45, p46, p47, p48, p49, p50, p51, p52, p53, p54,
-                              p55, p56, p57, p58, p59, p60, p61, p62, p63, p64, p65, p66)
-            TO_TUPLE_TEMPLATE(68, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43, p44, p45, p46, p47, p48, p49, p50, p51, p52, p53, p54,
-                              p55, p56, p57, p58, p59, p60, p61, p62, p63, p64, p65, p66, p67)
-            TO_TUPLE_TEMPLATE(69, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43, p44, p45, p46, p47, p48, p49, p50, p51, p52, p53, p54,
-                              p55, p56, p57, p58, p59, p60, p61, p62, p63, p64, p65, p66, p67, p68)
-            TO_TUPLE_TEMPLATE(70, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43, p44, p45, p46, p47, p48, p49, p50, p51, p52, p53, p54,
-                              p55, p56, p57, p58, p59, p60, p61, p62, p63, p64, p65, p66, p67, p68, p69)
-            TO_TUPLE_TEMPLATE(71, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43, p44, p45, p46, p47, p48, p49, p50, p51, p52, p53, p54,
-                              p55, p56, p57, p58, p59, p60, p61, p62, p63, p64, p65, p66, p67, p68, p69, p70)
-            TO_TUPLE_TEMPLATE(72, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43, p44, p45, p46, p47, p48, p49, p50, p51, p52, p53, p54,
-                              p55, p56, p57, p58, p59, p60, p61, p62, p63, p64, p65, p66, p67, p68, p69, p70, p71)
-            TO_TUPLE_TEMPLATE(73, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43, p44, p45, p46, p47, p48, p49, p50, p51, p52, p53, p54,
-                              p55, p56, p57, p58, p59, p60, p61, p62, p63, p64, p65, p66, p67, p68, p69, p70, p71, p72)
-            TO_TUPLE_TEMPLATE(74, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43, p44, p45, p46, p47, p48, p49, p50, p51, p52, p53, p54,
-                              p55, p56, p57, p58, p59, p60, p61, p62, p63, p64, p65, p66, p67, p68, p69, p70, p71, p72,
-                              p73)
-            TO_TUPLE_TEMPLATE(75, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43, p44, p45, p46, p47, p48, p49, p50, p51, p52, p53, p54,
-                              p55, p56, p57, p58, p59, p60, p61, p62, p63, p64, p65, p66, p67, p68, p69, p70, p71, p72,
-                              p73, p74)
-            TO_TUPLE_TEMPLATE(76, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43, p44, p45, p46, p47, p48, p49, p50, p51, p52, p53, p54,
-                              p55, p56, p57, p58, p59, p60, p61, p62, p63, p64, p65, p66, p67, p68, p69, p70, p71, p72,
-                              p73, p74, p75)
-            TO_TUPLE_TEMPLATE(77, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43, p44, p45, p46, p47, p48, p49, p50, p51, p52, p53, p54,
-                              p55, p56, p57, p58, p59, p60, p61, p62, p63, p64, p65, p66, p67, p68, p69, p70, p71, p72,
-                              p73, p74, p75, p76)
-            TO_TUPLE_TEMPLATE(78, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43, p44, p45, p46, p47, p48, p49, p50, p51, p52, p53, p54,
-                              p55, p56, p57, p58, p59, p60, p61, p62, p63, p64, p65, p66, p67, p68, p69, p70, p71, p72,
-                              p73, p74, p75, p76, p77)
-            TO_TUPLE_TEMPLATE(79, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43, p44, p45, p46, p47, p48, p49, p50, p51, p52, p53, p54,
-                              p55, p56, p57, p58, p59, p60, p61, p62, p63, p64, p65, p66, p67, p68, p69, p70, p71, p72,
-                              p73, p74, p75, p76, p77, p78)
-            TO_TUPLE_TEMPLATE(80, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43, p44, p45, p46, p47, p48, p49, p50, p51, p52, p53, p54,
-                              p55, p56, p57, p58, p59, p60, p61, p62, p63, p64, p65, p66, p67, p68, p69, p70, p71, p72,
-                              p73, p74, p75, p76, p77, p78, p79)
-            TO_TUPLE_TEMPLATE(81, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43, p44, p45, p46, p47, p48, p49, p50, p51, p52, p53, p54,
-                              p55, p56, p57, p58, p59, p60, p61, p62, p63, p64, p65, p66, p67, p68, p69, p70, p71, p72,
-                              p73, p74, p75, p76, p77, p78, p79, p80)
-            TO_TUPLE_TEMPLATE(82, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43, p44, p45, p46, p47, p48, p49, p50, p51, p52, p53, p54,
-                              p55, p56, p57, p58, p59, p60, p61, p62, p63, p64, p65, p66, p67, p68, p69, p70, p71, p72,
-                              p73, p74, p75, p76, p77, p78, p79, p80, p81)
-            TO_TUPLE_TEMPLATE(83, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43, p44, p45, p46, p47, p48, p49, p50, p51, p52, p53, p54,
-                              p55, p56, p57, p58, p59, p60, p61, p62, p63, p64, p65, p66, p67, p68, p69, p70, p71, p72,
-                              p73, p74, p75, p76, p77, p78, p79, p80, p81, p82)
-            TO_TUPLE_TEMPLATE(84, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43, p44, p45, p46, p47, p48, p49, p50, p51, p52, p53, p54,
-                              p55, p56, p57, p58, p59, p60, p61, p62, p63, p64, p65, p66, p67, p68, p69, p70, p71, p72,
-                              p73, p74, p75, p76, p77, p78, p79, p80, p81, p82, p83)
-            TO_TUPLE_TEMPLATE(85, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43, p44, p45, p46, p47, p48, p49, p50, p51, p52, p53, p54,
-                              p55, p56, p57, p58, p59, p60, p61, p62, p63, p64, p65, p66, p67, p68, p69, p70, p71, p72,
-                              p73, p74, p75, p76, p77, p78, p79, p80, p81, p82, p83, p84)
-            TO_TUPLE_TEMPLATE(86, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43, p44, p45, p46, p47, p48, p49, p50, p51, p52, p53, p54,
-                              p55, p56, p57, p58, p59, p60, p61, p62, p63, p64, p65, p66, p67, p68, p69, p70, p71, p72,
-                              p73, p74, p75, p76, p77, p78, p79, p80, p81, p82, p83, p84, p85)
-            TO_TUPLE_TEMPLATE(87, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43, p44, p45, p46, p47, p48, p49, p50, p51, p52, p53, p54,
-                              p55, p56, p57, p58, p59, p60, p61, p62, p63, p64, p65, p66, p67, p68, p69, p70, p71, p72,
-                              p73, p74, p75, p76, p77, p78, p79, p80, p81, p82, p83, p84, p85, p86)
-            TO_TUPLE_TEMPLATE(88, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43, p44, p45, p46, p47, p48, p49, p50, p51, p52, p53, p54,
-                              p55, p56, p57, p58, p59, p60, p61, p62, p63, p64, p65, p66, p67, p68, p69, p70, p71, p72,
-                              p73, p74, p75, p76, p77, p78, p79, p80, p81, p82, p83, p84, p85, p86, p87)
-            TO_TUPLE_TEMPLATE(89, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43, p44, p45, p46, p47, p48, p49, p50, p51, p52, p53, p54,
-                              p55, p56, p57, p58, p59, p60, p61, p62, p63, p64, p65, p66, p67, p68, p69, p70, p71, p72,
-                              p73, p74, p75, p76, p77, p78, p79, p80, p81, p82, p83, p84, p85, p86, p87, p88)
-            TO_TUPLE_TEMPLATE(90, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43, p44, p45, p46, p47, p48, p49, p50, p51, p52, p53, p54,
-                              p55, p56, p57, p58, p59, p60, p61, p62, p63, p64, p65, p66, p67, p68, p69, p70, p71, p72,
-                              p73, p74, p75, p76, p77, p78, p79, p80, p81, p82, p83, p84, p85, p86, p87, p88, p89)
-            TO_TUPLE_TEMPLATE(91, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43, p44, p45, p46, p47, p48, p49, p50, p51, p52, p53, p54,
-                              p55, p56, p57, p58, p59, p60, p61, p62, p63, p64, p65, p66, p67, p68, p69, p70, p71, p72,
-                              p73, p74, p75, p76, p77, p78, p79, p80, p81, p82, p83, p84, p85, p86, p87, p88, p89, p90)
-            TO_TUPLE_TEMPLATE(92, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43, p44, p45, p46, p47, p48, p49, p50, p51, p52, p53, p54,
-                              p55, p56, p57, p58, p59, p60, p61, p62, p63, p64, p65, p66, p67, p68, p69, p70, p71, p72,
-                              p73, p74, p75, p76, p77, p78, p79, p80, p81, p82, p83, p84, p85, p86, p87, p88, p89, p90,
-                              p91)
-            TO_TUPLE_TEMPLATE(93, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43, p44, p45, p46, p47, p48, p49, p50, p51, p52, p53, p54,
-                              p55, p56, p57, p58, p59, p60, p61, p62, p63, p64, p65, p66, p67, p68, p69, p70, p71, p72,
-                              p73, p74, p75, p76, p77, p78, p79, p80, p81, p82, p83, p84, p85, p86, p87, p88, p89, p90,
-                              p91, p92)
-            TO_TUPLE_TEMPLATE(94, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43, p44, p45, p46, p47, p48, p49, p50, p51, p52, p53, p54,
-                              p55, p56, p57, p58, p59, p60, p61, p62, p63, p64, p65, p66, p67, p68, p69, p70, p71, p72,
-                              p73, p74, p75, p76, p77, p78, p79, p80, p81, p82, p83, p84, p85, p86, p87, p88, p89, p90,
-                              p91, p92, p93)
-            TO_TUPLE_TEMPLATE(95, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43, p44, p45, p46, p47, p48, p49, p50, p51, p52, p53, p54,
-                              p55, p56, p57, p58, p59, p60, p61, p62, p63, p64, p65, p66, p67, p68, p69, p70, p71, p72,
-                              p73, p74, p75, p76, p77, p78, p79, p80, p81, p82, p83, p84, p85, p86, p87, p88, p89, p90,
-                              p91, p92, p93, p94)
-            TO_TUPLE_TEMPLATE(96, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43, p44, p45, p46, p47, p48, p49, p50, p51, p52, p53, p54,
-                              p55, p56, p57, p58, p59, p60, p61, p62, p63, p64, p65, p66, p67, p68, p69, p70, p71, p72,
-                              p73, p74, p75, p76, p77, p78, p79, p80, p81, p82, p83, p84, p85, p86, p87, p88, p89, p90,
-                              p91, p92, p93, p94, p95)
-            TO_TUPLE_TEMPLATE(97, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43, p44, p45, p46, p47, p48, p49, p50, p51, p52, p53, p54,
-                              p55, p56, p57, p58, p59, p60, p61, p62, p63, p64, p65, p66, p67, p68, p69, p70, p71, p72,
-                              p73, p74, p75, p76, p77, p78, p79, p80, p81, p82, p83, p84, p85, p86, p87, p88, p89, p90,
-                              p91, p92, p93, p94, p95, p96)
-            TO_TUPLE_TEMPLATE(98, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43, p44, p45, p46, p47, p48, p49, p50, p51, p52, p53, p54,
-                              p55, p56, p57, p58, p59, p60, p61, p62, p63, p64, p65, p66, p67, p68, p69, p70, p71, p72,
-                              p73, p74, p75, p76, p77, p78, p79, p80, p81, p82, p83, p84, p85, p86, p87, p88, p89, p90,
-                              p91, p92, p93, p94, p95, p96, p97)
-            TO_TUPLE_TEMPLATE(99, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43, p44, p45, p46, p47, p48, p49, p50, p51, p52, p53, p54,
-                              p55, p56, p57, p58, p59, p60, p61, p62, p63, p64, p65, p66, p67, p68, p69, p70, p71, p72,
-                              p73, p74, p75, p76, p77, p78, p79, p80, p81, p82, p83, p84, p85, p86, p87, p88, p89, p90,
-                              p91, p92, p93, p94, p95, p96, p97, p98)
-            TO_TUPLE_TEMPLATE(100, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
-                              p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36,
-                              p37, p38, p39, p40, p41, p42, p43, p44, p45, p46, p47, p48, p49, p50, p51, p52, p53, p54,
-                              p55, p56, p57, p58, p59, p60, p61, p62, p63, p64, p65, p66, p67, p68, p69, p70, p71, p72,
-                              p73, p74, p75, p76, p77, p78, p79, p80, p81, p82, p83, p84, p85, p86, p87, p88, p89, p90,
-                              p91, p92, p93, p94, p95, p96, p97, p98, p99)
+            // clang-format off
+            TO_TUPLE_TEMPLATE(1) TO_TUPLE_TEMPLATE(2) TO_TUPLE_TEMPLATE(3) TO_TUPLE_TEMPLATE(4) TO_TUPLE_TEMPLATE(5) TO_TUPLE_TEMPLATE(6) TO_TUPLE_TEMPLATE(7) TO_TUPLE_TEMPLATE(8)
+            TO_TUPLE_TEMPLATE(9) TO_TUPLE_TEMPLATE(10) TO_TUPLE_TEMPLATE(11) TO_TUPLE_TEMPLATE(12) TO_TUPLE_TEMPLATE(13) TO_TUPLE_TEMPLATE(14) TO_TUPLE_TEMPLATE(15) TO_TUPLE_TEMPLATE(16)
+            TO_TUPLE_TEMPLATE(17) TO_TUPLE_TEMPLATE(18) TO_TUPLE_TEMPLATE(19) TO_TUPLE_TEMPLATE(20) TO_TUPLE_TEMPLATE(21) TO_TUPLE_TEMPLATE(22) TO_TUPLE_TEMPLATE(23) TO_TUPLE_TEMPLATE(24)
+            TO_TUPLE_TEMPLATE(25) TO_TUPLE_TEMPLATE(26) TO_TUPLE_TEMPLATE(27) TO_TUPLE_TEMPLATE(28) TO_TUPLE_TEMPLATE(29) TO_TUPLE_TEMPLATE(30) TO_TUPLE_TEMPLATE(31) TO_TUPLE_TEMPLATE(32)
+            TO_TUPLE_TEMPLATE(33) TO_TUPLE_TEMPLATE(34) TO_TUPLE_TEMPLATE(35) TO_TUPLE_TEMPLATE(36) TO_TUPLE_TEMPLATE(37) TO_TUPLE_TEMPLATE(38) TO_TUPLE_TEMPLATE(39) TO_TUPLE_TEMPLATE(40)
+            TO_TUPLE_TEMPLATE(41) TO_TUPLE_TEMPLATE(42) TO_TUPLE_TEMPLATE(43) TO_TUPLE_TEMPLATE(44) TO_TUPLE_TEMPLATE(45) TO_TUPLE_TEMPLATE(46) TO_TUPLE_TEMPLATE(47) TO_TUPLE_TEMPLATE(48)
+            TO_TUPLE_TEMPLATE(49) TO_TUPLE_TEMPLATE(50) TO_TUPLE_TEMPLATE(51) TO_TUPLE_TEMPLATE(52) TO_TUPLE_TEMPLATE(53) TO_TUPLE_TEMPLATE(54) TO_TUPLE_TEMPLATE(55) TO_TUPLE_TEMPLATE(56)
+            TO_TUPLE_TEMPLATE(57) TO_TUPLE_TEMPLATE(58) TO_TUPLE_TEMPLATE(59) TO_TUPLE_TEMPLATE(60) TO_TUPLE_TEMPLATE(61) TO_TUPLE_TEMPLATE(62) TO_TUPLE_TEMPLATE(63) TO_TUPLE_TEMPLATE(64)
+            TO_TUPLE_TEMPLATE(65) TO_TUPLE_TEMPLATE(66) TO_TUPLE_TEMPLATE(67) TO_TUPLE_TEMPLATE(68) TO_TUPLE_TEMPLATE(69) TO_TUPLE_TEMPLATE(70) TO_TUPLE_TEMPLATE(71) TO_TUPLE_TEMPLATE(72)
+            TO_TUPLE_TEMPLATE(73) TO_TUPLE_TEMPLATE(74) TO_TUPLE_TEMPLATE(75) TO_TUPLE_TEMPLATE(76) TO_TUPLE_TEMPLATE(77) TO_TUPLE_TEMPLATE(78) TO_TUPLE_TEMPLATE(79) TO_TUPLE_TEMPLATE(80)
+            TO_TUPLE_TEMPLATE(81) TO_TUPLE_TEMPLATE(82) TO_TUPLE_TEMPLATE(83) TO_TUPLE_TEMPLATE(84) TO_TUPLE_TEMPLATE(85) TO_TUPLE_TEMPLATE(86) TO_TUPLE_TEMPLATE(87) TO_TUPLE_TEMPLATE(88)
+            TO_TUPLE_TEMPLATE(89) TO_TUPLE_TEMPLATE(90) TO_TUPLE_TEMPLATE(91) TO_TUPLE_TEMPLATE(92) TO_TUPLE_TEMPLATE(93) TO_TUPLE_TEMPLATE(94) TO_TUPLE_TEMPLATE(95) TO_TUPLE_TEMPLATE(96)
+            TO_TUPLE_TEMPLATE(97) TO_TUPLE_TEMPLATE(98) TO_TUPLE_TEMPLATE(99) TO_TUPLE_TEMPLATE(100)
 
             template <decomposable T>
             struct field_type_info_of : decltype(field_type_tuple<T>())
             {
             };
-#undef FIELD_RFL_EVAL0
-#undef FIELD_RFL_EVAL1
-#undef FIELD_RFL_EVAL2
-#undef FIELD_RFL_EVAL3
-#undef FIELD_RFL_EVAL4
-#undef FIELD_RFL_EVAL
-#undef FIELD_RFL_MAP_END
-#undef FIELD_RFL_MAP_OUT
-#undef FIELD_RFL_MAP_COMMA
-#undef FIELD_RFL_MAP_GET_END2
-#undef FIELD_RFL_MAP_GET_END1
-#undef FIELD_RFL_MAP_GET_END
-#undef FIELD_RFL_MAP_NEXT0
-#undef FIELD_RFL_MAP_NEXT1
-#undef FIELD_RFL_MAP_NEXT
-#undef FIELD_RFL_MAP0
-#undef FIELD_RFL_MAP1
-#undef FIELD_RFL_MAP_LIST_NEXT1
-#undef FIELD_RFL_MAP_LIST_NEXT
-#undef FIELD_RFL_MAP_LIST0
-#undef FIELD_RFL_MAP_LIST1
-#undef FIELD_RFL_MAP
-#undef FIELD_RFL_MAP_LIST
-#undef FIELD_RFL_DECLTYPE
-#undef FIELD_RFL_FIELD_TYPE
-#undef FIELD_RFL_FORWARD
+            // clang-format on
+
+#undef FIELD_RFL_SEQ1
+#undef FIELD_RFL_SEQ2
+#undef FIELD_RFL_SEQ3
+#undef FIELD_RFL_SEQ4
+#undef FIELD_RFL_SEQ5
+#undef FIELD_RFL_SEQ6
+#undef FIELD_RFL_SEQ7
+#undef FIELD_RFL_SEQ8
+#undef FIELD_RFL_SEQ9
+#undef FIELD_RFL_SEQ10
+#undef FIELD_RFL_SEQ11
+#undef FIELD_RFL_SEQ12
+#undef FIELD_RFL_SEQ13
+#undef FIELD_RFL_SEQ14
+#undef FIELD_RFL_SEQ15
+#undef FIELD_RFL_SEQ16
+#undef FIELD_RFL_SEQ17
+#undef FIELD_RFL_SEQ18
+#undef FIELD_RFL_SEQ19
+#undef FIELD_RFL_SEQ20
+#undef FIELD_RFL_SEQ21
+#undef FIELD_RFL_SEQ22
+#undef FIELD_RFL_SEQ23
+#undef FIELD_RFL_SEQ24
+#undef FIELD_RFL_SEQ25
+#undef FIELD_RFL_SEQ26
+#undef FIELD_RFL_SEQ27
+#undef FIELD_RFL_SEQ28
+#undef FIELD_RFL_SEQ29
+#undef FIELD_RFL_SEQ30
+#undef FIELD_RFL_SEQ31
+#undef FIELD_RFL_SEQ32
+#undef FIELD_RFL_SEQ33
+#undef FIELD_RFL_SEQ34
+#undef FIELD_RFL_SEQ35
+#undef FIELD_RFL_SEQ36
+#undef FIELD_RFL_SEQ37
+#undef FIELD_RFL_SEQ38
+#undef FIELD_RFL_SEQ39
+#undef FIELD_RFL_SEQ40
+#undef FIELD_RFL_SEQ41
+#undef FIELD_RFL_SEQ42
+#undef FIELD_RFL_SEQ43
+#undef FIELD_RFL_SEQ44
+#undef FIELD_RFL_SEQ45
+#undef FIELD_RFL_SEQ46
+#undef FIELD_RFL_SEQ47
+#undef FIELD_RFL_SEQ48
+#undef FIELD_RFL_SEQ49
+#undef FIELD_RFL_SEQ50
+#undef FIELD_RFL_SEQ51
+#undef FIELD_RFL_SEQ52
+#undef FIELD_RFL_SEQ53
+#undef FIELD_RFL_SEQ54
+#undef FIELD_RFL_SEQ55
+#undef FIELD_RFL_SEQ56
+#undef FIELD_RFL_SEQ57
+#undef FIELD_RFL_SEQ58
+#undef FIELD_RFL_SEQ59
+#undef FIELD_RFL_SEQ60
+#undef FIELD_RFL_SEQ61
+#undef FIELD_RFL_SEQ62
+#undef FIELD_RFL_SEQ63
+#undef FIELD_RFL_SEQ64
+#undef FIELD_RFL_SEQ65
+#undef FIELD_RFL_SEQ66
+#undef FIELD_RFL_SEQ67
+#undef FIELD_RFL_SEQ68
+#undef FIELD_RFL_SEQ69
+#undef FIELD_RFL_SEQ70
+#undef FIELD_RFL_SEQ71
+#undef FIELD_RFL_SEQ72
+#undef FIELD_RFL_SEQ73
+#undef FIELD_RFL_SEQ74
+#undef FIELD_RFL_SEQ75
+#undef FIELD_RFL_SEQ76
+#undef FIELD_RFL_SEQ77
+#undef FIELD_RFL_SEQ78
+#undef FIELD_RFL_SEQ79
+#undef FIELD_RFL_SEQ80
+#undef FIELD_RFL_SEQ81
+#undef FIELD_RFL_SEQ82
+#undef FIELD_RFL_SEQ83
+#undef FIELD_RFL_SEQ84
+#undef FIELD_RFL_SEQ85
+#undef FIELD_RFL_SEQ86
+#undef FIELD_RFL_SEQ87
+#undef FIELD_RFL_SEQ88
+#undef FIELD_RFL_SEQ89
+#undef FIELD_RFL_SEQ90
+#undef FIELD_RFL_SEQ91
+#undef FIELD_RFL_SEQ92
+#undef FIELD_RFL_SEQ93
+#undef FIELD_RFL_SEQ94
+#undef FIELD_RFL_SEQ95
+#undef FIELD_RFL_SEQ96
+#undef FIELD_RFL_SEQ97
+#undef FIELD_RFL_SEQ98
+#undef FIELD_RFL_SEQ99
+#undef FIELD_RFL_SEQ100
+#undef FIELD_RFL_ID
 #undef FIELD_RFL_ADDR
-#undef FIELD_RFL_NOT_BIT_FIELD
+#undef FIELD_RFL_DECLTYPE
+#undef FIELD_RFL_FORWARD
+#undef FIELD_RFL_SIZEOF
 #undef FIELD_RFL_NO_BIT_FIELDS
-#undef FIELD_RFL_MOVE
 #undef TO_TUPLE_TEMPLATE
 #if defined(_MSC_VER)
 #pragma endregion TO_TUPLE_TEMPLATE_MACRO
