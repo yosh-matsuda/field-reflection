@@ -1293,45 +1293,62 @@ namespace field_reflection
         constexpr std::size_t field_count = detail::field_count<T>;
 
         template <typename T, std::size_t N, reflect_options O = reflect_options{}>
-        requires field_namable<T, O>
+        requires field_namable<T, O> && (N < field_count<T, O>)
         constexpr std::string_view field_name = detail::field_name<T, N>;
 
         template <typename T, std::size_t N, reflect_options O = reflect_options{}>
-        requires field_referenceable<T, O>
+        requires field_referenceable<T, O> && (N < field_count<T, O>)
         using field_type = detail::field_type<T, N>;
 
+        namespace detail
+        {
+            template <typename U, std::size_t N, typename T, typename V>
+            concept field_assignable =
+                requires(T& t, V&& value) { *std::get<N>(to_ptr_tuple(t)) = std::forward<V>(value); };
+
+            // to_tuple copies or moves the whole object to decompose it.
+            template <typename T, reflect_options O>
+            consteval bool to_tuple_supported()
+            {
+                using U = std::remove_cvref_t<T>;
+                return std::is_constructible_v<U, T&&> && []<std::size_t... Is>(std::index_sequence<Is...>) {
+                    return (!std::is_array_v<field_type<U, Is>> && ...);
+                }(std::make_index_sequence<field_reflection::field_count<U, O>>());
+            }
+        }  // namespace detail
+
         template <std::size_t N, reflect_options O, typename T, field_referenceable<O> U = std::remove_cvref_t<T>>
+        requires (N < field_count<U, O>)
         constexpr decltype(auto) get_field(T& t) noexcept
         {
             return *std::get<N>(detail::to_ptr_tuple(t));
         }
 
+        // An array member of an rvalue cannot be returned by value.
         template <std::size_t N, reflect_options O, typename T, field_referenceable<O> U = std::remove_cvref_t<T>>
-        requires std::is_rvalue_reference_v<T&&>
+        requires std::is_rvalue_reference_v<T&&> && (N < field_count<U, O>) &&
+                 (!std::is_array_v<std::remove_reference_t<field_type<U, N, O>>>)
         constexpr auto get_field(T&& t) noexcept(
             std::is_nothrow_constructible_v<
                 std::decay_t<field_type<U, N, O>>,
                 decltype(detail::forward_member<U, N>(std::get<N>(detail::to_ptr_tuple(t))))>)
         {
-            static_assert(!std::is_array_v<std::remove_reference_t<field_type<U, N, O>>>,
-                          "get_field cannot return an array member of an rvalue by value");
             return detail::forward_member<U, N>(std::get<N>(detail::to_ptr_tuple(t)));
         }
 
         template <std::size_t N, reflect_options O, typename T, typename V,
                   field_referenceable<O> U = std::remove_cvref_t<T>>
+        requires (N < field_count<U, O>) && detail::field_assignable<U, N, T, V>
         constexpr void set_field(T& t, V&& value)
         {
             *std::get<N>(detail::to_ptr_tuple(t)) = std::forward<V>(value);
         }
 
+        // C array members are not supported.
         template <reflect_options O, typename T, field_referenceable<O> U = std::remove_cvref_t<T>>
+        requires (detail::to_tuple_supported<T, O>())
         constexpr auto to_tuple(T&& t)
         {
-            []<std::size_t... Is>(std::index_sequence<Is...>) {
-                static_assert((!std::is_array_v<field_type<U, Is, O>> && ...),
-                              "to_tuple does not support C array members");
-            }(std::make_index_sequence<field_count<U, O>>());
             return detail::to_tuple_impl(std::forward<T>(t));
         }
 #else
@@ -1635,46 +1652,72 @@ namespace field_reflection
         constexpr std::size_t field_count = detail::members_of_v<T>.size();
 
         template <typename T, std::size_t N, reflect_options O = reflect_options{}>
-        requires field_namable<T, O>
+        requires field_namable<T, O> && (N < field_count<T, O>)
         constexpr std::string_view field_name = std::define_static_string(std::meta::identifier_of(detail::member_at<T, N>));
 
         template <typename T, std::size_t N, reflect_options O = reflect_options{}>
-        requires field_referenceable<T, O>
+        requires field_referenceable<T, O> && (N < field_count<T, O>)
         using field_type = typename [:detail::field_type_of<T, N>():];
         // clang-format on
 
+        namespace detail
+        {
+            template <typename U, std::size_t N, typename T, typename V>
+            concept field_assignable = requires(T& t, V&& value) { t.[:member_at<U, N>:] = std::forward<V>(value); };
+
+            // Argument from which to_tuple constructs the element for the N-th field
+            template <typename T, std::size_t N, reflect_options O>
+            using to_tuple_arg_t = std::conditional_t<
+                std::is_rvalue_reference_v<T&&>,
+                decltype(forward_member<std::remove_cvref_t<T>, N>(std::declval<T&&>())),
+                std::conditional_t<std::is_rvalue_reference_v<field_type<std::remove_cvref_t<T>, N, O>>,
+                                   field_type<std::remove_cvref_t<T>, N, O>,
+                                   decltype(get_member<std::remove_cvref_t<T>, N>(std::declval<T&>()))>>;
+
+            template <typename T, reflect_options O>
+            consteval bool to_tuple_supported()
+            {
+                using U = std::remove_cvref_t<T>;
+                return []<std::size_t... Is>(std::index_sequence<Is...>) {
+                    return ((!std::is_array_v<field_type<U, Is, O>> && meta::has_identifier(member_at<U, Is>) &&
+                             std::is_constructible_v<field_type<U, Is, O>, to_tuple_arg_t<T, Is, O>>) &&
+                            ...);
+                }(std::make_index_sequence<field_count<U, O>>());
+            }
+        }  // namespace detail
+
         template <std::size_t N, reflect_options O, typename T, field_referenceable<O> U = std::remove_cvref_t<T>>
+        requires (N < field_count<U, O>)
         constexpr decltype(auto) get_field(T& t) noexcept
         {
             return detail::get_member<U, N>(t);
         }
 
+        // An array member of an rvalue cannot be returned by value.
         template <std::size_t N, reflect_options O, typename T, field_referenceable<O> U = std::remove_cvref_t<T>>
-        requires std::is_rvalue_reference_v<T&&>
+        requires std::is_rvalue_reference_v<T&&> && (N < field_count<U, O>) &&
+                 (!std::is_array_v<std::remove_reference_t<field_type<U, N, O>>>)
         constexpr auto get_field(T&& t) noexcept(
             std::is_nothrow_constructible_v<std::decay_t<field_type<U, N, O>>,
                                             decltype(detail::forward_member<U, N>(std::move(t)))>)
         {
-            static_assert(!std::is_array_v<std::remove_reference_t<field_type<U, N, O>>>,
-                          "get_field cannot return an array member of an rvalue by value");
             return detail::forward_member<U, N>(std::move(t));
         }
 
         template <std::size_t N, reflect_options O, typename T, typename V,
                   field_referenceable<O> U = std::remove_cvref_t<T>>
+        requires (N < field_count<U, O>) && detail::field_assignable<U, N, T, V>
         constexpr void set_field(T& t, V&& value)
         {
             detail::set_member<U, N>(t, std::forward<V>(value));
         }
 
+        // C array members and anonymous members are not supported.
         template <reflect_options O, typename T, field_referenceable<O> U = std::remove_cvref_t<T>>
+        requires (detail::to_tuple_supported<T, O>())
         constexpr auto to_tuple(T&& t)
         {
             return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-                static_assert((!std::is_array_v<field_type<U, Is, O>> && ...),
-                              "to_tuple does not support C array members");
-                static_assert((std::meta::has_identifier(detail::member_at<U, Is>) && ...),
-                              "to_tuple does not support anonymous union members");
                 if constexpr (std::is_rvalue_reference_v<T&&>)
                 {
                     return std::tuple<field_type<U, Is, O>...>(detail::forward_member<U, Is>(std::move(t))...);
@@ -1693,12 +1736,12 @@ namespace field_reflection
 #if FIELD_RFL_ANNOTATIONS
         // Annotations (P3394) of type A attached to the N-th field
         template <typename T, std::size_t N, typename A, reflect_options O = reflect_options{}>
-        requires field_countable<T, O>
+        requires field_countable<T, O> && (N < field_count<T, O>)
         constexpr auto field_annotations = detail::annotations_v<detail::member_at<T, N>, A>;
 
         // The first annotation of type A attached to the N-th field, if any
         template <typename T, std::size_t N, typename A, reflect_options O = reflect_options{}>
-        requires field_countable<T, O>
+        requires field_countable<T, O> && (N < field_count<T, O>)
         constexpr std::optional<A> field_annotation = detail::annotation_v<detail::member_at<T, N>, A>;
 
         // clang-format off
@@ -1715,26 +1758,69 @@ namespace field_reflection
 
         namespace detail
         {
+            template <typename R, bool Pred>
+            concept visitor_result = !Pred || requires(R&& r) { static_cast<bool>(std::forward<R>(r)); };
+
+            template <bool Pred, std::size_t I, typename Func, typename... S>
+            concept field_visitor = requires(Func& func, S&... storage) {
+                { func(get_stored_field<I>(storage)...) } -> visitor_result<Pred>;
+            };
+
+            template <bool Pred, std::size_t I, typename U, reflect_options O, typename Func, typename... S>
+            concept named_field_visitor = requires(Func& func, S&... storage) {
+                {
+                    func(field_reflection::field_name<U, I, O>, get_stored_field<I>(storage)...)
+                } -> visitor_result<Pred>;
+            };
+
+            enum class visitor_kind
+            {
+                invalid,
+                fields,
+                name_and_fields,
+            };
+
+            // How func is called with the fields of objects of types T and Ts... A predicate (Pred) must return a
+            // value convertible to bool.
+            template <reflect_options O, bool Pred, typename Func, typename T, typename... Ts, std::size_t... Is>
+            consteval visitor_kind get_visitor_kind(std::index_sequence<Is...>)
+            {
+                using U = std::remove_cvref_t<T>;
+                using S = decltype(make_field_storage<O>(std::declval<T>()));
+                if constexpr ((field_visitor<Pred, Is, Func, S,
+                                             decltype(make_field_storage<O>(std::declval<Ts>()))...> &&
+                               ...))
+                {
+                    return visitor_kind::fields;
+                }
+                else if constexpr ((named_field_visitor<Pred, Is, U, O, Func, S,
+                                                        decltype(make_field_storage<O>(std::declval<Ts>()))...> &&
+                                    ...))
+                {
+                    return visitor_kind::name_and_fields;
+                }
+                else
+                {
+                    return visitor_kind::invalid;
+                }
+            }
+
+            template <reflect_options O, bool Pred, typename Func, typename T, typename... Ts>
+            constexpr visitor_kind visitor_kind_v = get_visitor_kind<O, Pred, Func, T, Ts...>(
+                std::make_index_sequence<field_reflection::field_count<std::remove_cvref_t<T>, O>>());
+
             template <reflect_options O, typename T, typename Func, std::size_t... Is>
             constexpr void for_each_field_impl(T&& t, Func&& func, std::index_sequence<Is...>)
             {
                 using U = std::remove_cvref_t<T>;
                 auto storage = make_field_storage<O>(std::forward<T>(t));
-                if constexpr (requires { (func(get_stored_field<Is>(storage)), ...); })
+                if constexpr (visitor_kind_v<O, false, Func, T> == visitor_kind::fields)
                 {
                     (func(get_stored_field<Is>(storage)), ...);
                 }
-                else if constexpr (requires {
-                                       (func(field_reflection::field_name<U, Is, O>, get_stored_field<Is>(storage)),
-                                        ...);
-                                   })
-                {
-                    (func(field_reflection::field_name<U, Is, O>, get_stored_field<Is>(storage)), ...);
-                }
                 else
                 {
-                    static_assert(always_false<std::remove_cvref_t<Func>>,
-                                  "invalid function object for call to for_each_field");
+                    (func(field_reflection::field_name<U, Is, O>, get_stored_field<Is>(storage)), ...);
                 }
             }
 
@@ -1744,24 +1830,15 @@ namespace field_reflection
                 using U = std::remove_cvref_t<T1>;
                 auto storage1 = make_field_storage<O>(std::forward<T1>(t1));
                 auto storage2 = make_field_storage<O>(std::forward<T2>(t2));
-                if constexpr (requires { (func(get_stored_field<Is>(storage1), get_stored_field<Is>(storage2)), ...); })
+                if constexpr (visitor_kind_v<O, false, Func, T1, T2> == visitor_kind::fields)
                 {
                     (func(get_stored_field<Is>(storage1), get_stored_field<Is>(storage2)), ...);
                 }
-                else if constexpr (requires {
-                                       (func(field_reflection::field_name<U, Is, O>, get_stored_field<Is>(storage1),
-                                             get_stored_field<Is>(storage2)),
-                                        ...);
-                                   })
+                else
                 {
                     (func(field_reflection::field_name<U, Is, O>, get_stored_field<Is>(storage1),
                           get_stored_field<Is>(storage2)),
                      ...);
-                }
-                else
-                {
-                    static_assert(always_false<std::remove_cvref_t<Func>>,
-                                  "invalid function object for call to for_each_field");
                 }
             }
 
@@ -1770,21 +1847,15 @@ namespace field_reflection
             {
                 using U = std::remove_cvref_t<T>;
                 auto storage = make_field_storage<O>(std::forward<T>(t));
-                if constexpr (requires { (func(get_stored_field<Is>(storage)) && ...); })
+                if constexpr (visitor_kind_v<O, true, Func, T> == visitor_kind::fields)
                 {
-                    return (func(get_stored_field<Is>(storage)) && ...);
-                }
-                else if constexpr (requires {
-                                       (func(field_reflection::field_name<U, Is, O>, get_stored_field<Is>(storage)) &&
-                                        ...);
-                                   })
-                {
-                    return (func(field_reflection::field_name<U, Is, O>, get_stored_field<Is>(storage)) && ...);
+                    return (static_cast<bool>(func(get_stored_field<Is>(storage))) && ...);
                 }
                 else
                 {
-                    static_assert(always_false<std::remove_cvref_t<Func>>,
-                                  "invalid function object for call to all_of_field");
+                    return (static_cast<bool>(
+                                func(field_reflection::field_name<U, Is, O>, get_stored_field<Is>(storage))) &&
+                            ...);
                 }
             }
 
@@ -1794,26 +1865,16 @@ namespace field_reflection
                 using U = std::remove_cvref_t<T1>;
                 auto storage1 = make_field_storage<O>(std::forward<T1>(t1));
                 auto storage2 = make_field_storage<O>(std::forward<T2>(t2));
-                if constexpr (requires {
-                                  (func(get_stored_field<Is>(storage1), get_stored_field<Is>(storage2)) && ...);
-                              })
+                if constexpr (visitor_kind_v<O, true, Func, T1, T2> == visitor_kind::fields)
                 {
-                    return (func(get_stored_field<Is>(storage1), get_stored_field<Is>(storage2)) && ...);
-                }
-                else if constexpr (requires {
-                                       (func(field_reflection::field_name<U, Is, O>, get_stored_field<Is>(storage1),
-                                             get_stored_field<Is>(storage2)) &&
-                                        ...);
-                                   })
-                {
-                    return (func(field_reflection::field_name<U, Is, O>, get_stored_field<Is>(storage1),
-                                 get_stored_field<Is>(storage2)) &&
+                    return (static_cast<bool>(func(get_stored_field<Is>(storage1), get_stored_field<Is>(storage2))) &&
                             ...);
                 }
                 else
                 {
-                    static_assert(always_false<std::remove_cvref_t<Func>>,
-                                  "invalid function object for call to all_of_field");
+                    return (static_cast<bool>(func(field_reflection::field_name<U, Is, O>,
+                                                   get_stored_field<Is>(storage1), get_stored_field<Is>(storage2))) &&
+                            ...);
                 }
             }
 
@@ -1822,21 +1883,15 @@ namespace field_reflection
             {
                 using U = std::remove_cvref_t<T>;
                 auto storage = make_field_storage<O>(std::forward<T>(t));
-                if constexpr (requires { (func(get_stored_field<Is>(storage)) || ...); })
+                if constexpr (visitor_kind_v<O, true, Func, T> == visitor_kind::fields)
                 {
-                    return (func(get_stored_field<Is>(storage)) || ...);
-                }
-                else if constexpr (requires {
-                                       (func(field_reflection::field_name<U, Is, O>, get_stored_field<Is>(storage)) ||
-                                        ...);
-                                   })
-                {
-                    return (func(field_reflection::field_name<U, Is, O>, get_stored_field<Is>(storage)) || ...);
+                    return (static_cast<bool>(func(get_stored_field<Is>(storage))) || ...);
                 }
                 else
                 {
-                    static_assert(always_false<std::remove_cvref_t<Func>>,
-                                  "invalid function object for call to any_of_field");
+                    return (static_cast<bool>(
+                                func(field_reflection::field_name<U, Is, O>, get_stored_field<Is>(storage))) ||
+                            ...);
                 }
             }
 
@@ -1846,34 +1901,27 @@ namespace field_reflection
                 using U = std::remove_cvref_t<T1>;
                 auto storage1 = make_field_storage<O>(std::forward<T1>(t1));
                 auto storage2 = make_field_storage<O>(std::forward<T2>(t2));
-                if constexpr (requires {
-                                  (func(get_stored_field<Is>(storage1), get_stored_field<Is>(storage2)) || ...);
-                              })
+                if constexpr (visitor_kind_v<O, true, Func, T1, T2> == visitor_kind::fields)
                 {
-                    return (func(get_stored_field<Is>(storage1), get_stored_field<Is>(storage2)) || ...);
-                }
-                else if constexpr (requires {
-                                       (func(field_reflection::field_name<U, Is, O>, get_stored_field<Is>(storage1),
-                                             get_stored_field<Is>(storage2)) ||
-                                        ...);
-                                   })
-                {
-                    return (func(field_reflection::field_name<U, Is, O>, get_stored_field<Is>(storage1),
-                                 get_stored_field<Is>(storage2)) ||
+                    return (static_cast<bool>(func(get_stored_field<Is>(storage1), get_stored_field<Is>(storage2))) ||
                             ...);
                 }
                 else
                 {
-                    static_assert(always_false<std::remove_cvref_t<Func>>,
-                                  "invalid function object for call to any_of_field");
+                    return (static_cast<bool>(func(field_reflection::field_name<U, Is, O>,
+                                                   get_stored_field<Is>(storage1), get_stored_field<Is>(storage2))) ||
+                            ...);
                 }
             }
         }  // namespace detail
 
+        // func is called with each field, or with the name and each field. With two objects, it is called with the
+        // corresponding fields of both.
         template <reflect_options O, typename T1, typename T2, typename Func,
                   field_referenceable<O> U1 = std::remove_cvref_t<T1>,
                   field_referenceable<O> U2 = std::remove_cvref_t<T2>>
-        requires std::is_same_v<U1, U2>
+        requires std::is_same_v<U1, U2> &&
+                 (detail::visitor_kind_v<O, false, Func, T1, T2> != detail::visitor_kind::invalid)
         constexpr void for_each_field(T1&& t1, T2&& t2, Func&& func)
         {
             detail::for_each_field_impl<O>(std::forward<T1>(t1), std::forward<T2>(t2), std::forward<Func>(func),
@@ -1881,6 +1929,7 @@ namespace field_reflection
         }
 
         template <reflect_options O, typename T, typename Func, field_referenceable<O> U = std::remove_cvref_t<T>>
+        requires (detail::visitor_kind_v<O, false, Func, T> != detail::visitor_kind::invalid)
         constexpr void for_each_field(T&& t, Func&& func)
         {
             detail::for_each_field_impl<O>(std::forward<T>(t), std::forward<Func>(func),
@@ -1890,7 +1939,8 @@ namespace field_reflection
         template <reflect_options O, typename T1, typename T2, typename Func,
                   field_referenceable<O> U1 = std::remove_cvref_t<T1>,
                   field_referenceable<O> U2 = std::remove_cvref_t<T2>>
-        requires std::is_same_v<U1, U2>
+        requires std::is_same_v<U1, U2> &&
+                 (detail::visitor_kind_v<O, true, Func, T1, T2> != detail::visitor_kind::invalid)
         constexpr bool all_of_field(T1&& t1, T2&& t2, Func&& func)
         {
             return detail::all_of_field_impl<O>(std::forward<T1>(t1), std::forward<T2>(t2), std::forward<Func>(func),
@@ -1898,6 +1948,7 @@ namespace field_reflection
         }
 
         template <reflect_options O, typename T, typename Func, field_referenceable<O> U = std::remove_cvref_t<T>>
+        requires (detail::visitor_kind_v<O, true, Func, T> != detail::visitor_kind::invalid)
         constexpr bool all_of_field(T&& t, Func&& func)
         {
             return detail::all_of_field_impl<O>(std::forward<T>(t), std::forward<Func>(func),
@@ -1907,7 +1958,8 @@ namespace field_reflection
         template <reflect_options O, typename T1, typename T2, typename Func,
                   field_referenceable<O> U1 = std::remove_cvref_t<T1>,
                   field_referenceable<O> U2 = std::remove_cvref_t<T2>>
-        requires std::is_same_v<U1, U2>
+        requires std::is_same_v<U1, U2> &&
+                 (detail::visitor_kind_v<O, true, Func, T1, T2> != detail::visitor_kind::invalid)
         constexpr bool any_of_field(T1&& t1, T2&& t2, Func&& func)
         {
             return detail::any_of_field_impl<O>(std::forward<T1>(t1), std::forward<T2>(t2), std::forward<Func>(func),
@@ -1915,6 +1967,7 @@ namespace field_reflection
         }
 
         template <reflect_options O, typename T, typename Func, field_referenceable<O> U = std::remove_cvref_t<T>>
+        requires (detail::visitor_kind_v<O, true, Func, T> != detail::visitor_kind::invalid)
         constexpr bool any_of_field(T&& t, Func&& func)
         {
             return detail::any_of_field_impl<O>(std::forward<T>(t), std::forward<Func>(func),
@@ -1922,26 +1975,31 @@ namespace field_reflection
         }
 
         // The overloads without options keep the template parameters of the previous versions, e.g., get_field<N, T>.
+        // They have the same constraints as the overloads with options.
         template <std::size_t N, typename T, field_referenceable U = std::remove_cvref_t<T>>
+        requires (N < field_count<U>)
         constexpr decltype(auto) get_field(T& t) noexcept
         {
             return get_field<N, reflect_options{}>(t);
         }
 
         template <std::size_t N, typename T, field_referenceable U = std::remove_cvref_t<T>>
-        requires std::is_rvalue_reference_v<T&&>
+        requires std::is_rvalue_reference_v<T&&> && (N < field_count<U>) &&
+                 (!std::is_array_v<std::remove_reference_t<field_type<U, N>>>)
         constexpr auto get_field(T&& t) noexcept(noexcept(get_field<N, reflect_options{}>(std::move(t))))
         {
             return get_field<N, reflect_options{}>(std::move(t));
         }
 
         template <std::size_t N, typename T, typename V, field_referenceable U = std::remove_cvref_t<T>>
+        requires (N < field_count<U>) && detail::field_assignable<U, N, T, V>
         constexpr void set_field(T& t, V&& value)
         {
             set_field<N, reflect_options{}>(t, std::forward<V>(value));
         }
 
         template <typename T, field_referenceable U = std::remove_cvref_t<T>>
+        requires (detail::to_tuple_supported<T, reflect_options{}>())
         constexpr auto to_tuple(T&& t)
         {
             return to_tuple<reflect_options{}>(std::forward<T>(t));
@@ -1949,13 +2007,15 @@ namespace field_reflection
 
         template <typename T1, typename T2, typename Func, field_referenceable U1 = std::remove_cvref_t<T1>,
                   field_referenceable U2 = std::remove_cvref_t<T2>>
-        requires std::is_same_v<U1, U2>
+        requires std::is_same_v<U1, U2> &&
+                 (detail::visitor_kind_v<reflect_options{}, false, Func, T1, T2> != detail::visitor_kind::invalid)
         constexpr void for_each_field(T1&& t1, T2&& t2, Func&& func)
         {
             for_each_field<reflect_options{}>(std::forward<T1>(t1), std::forward<T2>(t2), std::forward<Func>(func));
         }
 
         template <typename T, typename Func, field_referenceable U = std::remove_cvref_t<T>>
+        requires (detail::visitor_kind_v<reflect_options{}, false, Func, T> != detail::visitor_kind::invalid)
         constexpr void for_each_field(T&& t, Func&& func)
         {
             for_each_field<reflect_options{}>(std::forward<T>(t), std::forward<Func>(func));
@@ -1963,7 +2023,8 @@ namespace field_reflection
 
         template <typename T1, typename T2, typename Func, field_referenceable U1 = std::remove_cvref_t<T1>,
                   field_referenceable U2 = std::remove_cvref_t<T2>>
-        requires std::is_same_v<U1, U2>
+        requires std::is_same_v<U1, U2> &&
+                 (detail::visitor_kind_v<reflect_options{}, true, Func, T1, T2> != detail::visitor_kind::invalid)
         constexpr bool all_of_field(T1&& t1, T2&& t2, Func&& func)
         {
             return all_of_field<reflect_options{}>(std::forward<T1>(t1), std::forward<T2>(t2),
@@ -1971,6 +2032,7 @@ namespace field_reflection
         }
 
         template <typename T, typename Func, field_referenceable U = std::remove_cvref_t<T>>
+        requires (detail::visitor_kind_v<reflect_options{}, true, Func, T> != detail::visitor_kind::invalid)
         constexpr bool all_of_field(T&& t, Func&& func)
         {
             return all_of_field<reflect_options{}>(std::forward<T>(t), std::forward<Func>(func));
@@ -1978,7 +2040,8 @@ namespace field_reflection
 
         template <typename T1, typename T2, typename Func, field_referenceable U1 = std::remove_cvref_t<T1>,
                   field_referenceable U2 = std::remove_cvref_t<T2>>
-        requires std::is_same_v<U1, U2>
+        requires std::is_same_v<U1, U2> &&
+                 (detail::visitor_kind_v<reflect_options{}, true, Func, T1, T2> != detail::visitor_kind::invalid)
         constexpr bool any_of_field(T1&& t1, T2&& t2, Func&& func)
         {
             return any_of_field<reflect_options{}>(std::forward<T1>(t1), std::forward<T2>(t2),
@@ -1986,6 +2049,7 @@ namespace field_reflection
         }
 
         template <typename T, typename Func, field_referenceable U = std::remove_cvref_t<T>>
+        requires (detail::visitor_kind_v<reflect_options{}, true, Func, T> != detail::visitor_kind::invalid)
         constexpr bool any_of_field(T&& t, Func&& func)
         {
             return any_of_field<reflect_options{}>(std::forward<T>(t), std::forward<Func>(func));

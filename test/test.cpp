@@ -1174,4 +1174,59 @@ TEST(field_reflection, enum_edge_cases)
     static_assert(std::is_same_v<decltype(enum_cast<const my_enum>("blue")), std::optional<my_enum>>);
     static_assert(enum_cast<const my_enum>("blue") == my_enum::blue);
 }
+template <typename T, std::size_t N>
+concept has_field_name = requires { field_name<T, N>; };
+template <typename T, std::size_t N>
+concept has_field_type = requires { typename field_type<T, N>; };
+template <std::size_t N, typename T>
+concept can_get_field = requires(T&& t) { get_field<N>(std::forward<T>(t)); };
+template <std::size_t N, typename T, typename V>
+concept can_set_field = requires(T& t, V&& v) { set_field<N>(t, std::forward<V>(v)); };
+template <typename T>
+concept can_to_tuple = requires(T&& t) { to_tuple(std::forward<T>(t)); };
+template <typename T, typename F>
+concept can_for_each_field = requires(T&& t, F f) { for_each_field(std::forward<T>(t), f); };
+template <typename T, typename F>
+concept can_for_each_field2 = requires(T&& t, F f) { for_each_field(t, std::forward<T>(t), f); };
+template <typename T, typename F>
+concept can_all_of_field = requires(T&& t, F f) { all_of_field(std::forward<T>(t), f); };
+template <typename T, typename F>
+concept can_any_of_field = requires(T&& t, F f) { any_of_field(std::forward<T>(t), f); };
+// Invalid uses are detected by the constraints, so requires-expressions evaluate to false without compile errors.
+TEST(field_reflection, constraints)
+{
+    static_assert(has_field_name<my_struct1, 4>);
+    static_assert(!has_field_name<my_struct1, 5>);
+    static_assert(has_field_type<my_struct1, 4>);
+    static_assert(!has_field_type<my_struct1, 5>);
+    static_assert(can_get_field<4, my_struct1&>);
+    static_assert(!can_get_field<5, my_struct1&>);
+    static_assert(!can_get_field<5, my_struct1>);
+    static_assert(can_get_field<1, array_members>);
+    static_assert(!can_get_field<0, array_members>);  // an array member of an rvalue
+
+    static_assert(can_set_field<0, my_struct1, int>);
+    static_assert(!can_set_field<5, my_struct1, int>);
+    static_assert(!can_set_field<0, my_struct1, std::string>);
+    static_assert(!can_set_field<0, const my_struct1, int>);
+
+    static_assert(can_to_tuple<my_struct1&>);
+    static_assert(can_to_tuple<my_struct12>);
+    static_assert(!can_to_tuple<my_struct12&>);  // std::unique_ptr cannot be copied
+    static_assert(!can_to_tuple<array_members&>);
+
+    using any_visitor = decltype([](auto&&) { return true; });
+    using int_visitor = decltype([](int) {});
+    using named_visitor = decltype([](std::string_view, auto&&...) { return true; });
+    using void_visitor = decltype([](auto&&) {});
+    static_assert(can_for_each_field<my_struct1&, any_visitor>);
+    static_assert(can_for_each_field<my_struct1&, named_visitor>);
+    static_assert(!can_for_each_field<my_struct1&, int_visitor>);
+    static_assert(can_for_each_field2<my_struct1&, named_visitor>);
+    static_assert(!can_for_each_field2<my_struct1&, int_visitor>);
+    static_assert(can_all_of_field<my_struct1&, any_visitor>);
+    static_assert(!can_all_of_field<my_struct1&, void_visitor>);
+    static_assert(!can_any_of_field<my_struct1&, void_visitor>);
+    static_assert(can_any_of_field<my_struct1&, named_visitor>);
+}
 // NOLINTEND
