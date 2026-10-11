@@ -11,6 +11,10 @@
 // NOLINTBEGIN
 using namespace field_reflection;
 
+// Some results differ between the C++20 backend and the C++26 reflection backend because of the limitations of the
+// C++20 implementation, such as base classes and reference members.
+constexpr bool std_rfl = FIELD_RFL_STD_REFLECTION;
+
 template <typename, typename>
 concept test_castable = true;
 
@@ -133,6 +137,33 @@ struct my_struct15
 {
 };
 
+union my_union
+{
+    int i;
+    float f;
+};
+
+enum class my_enum
+{
+    red = 2,
+    green = -1,
+    blue = 1,
+    alias = 2,
+};
+
+enum unscoped_enum : unsigned char
+{
+    ue_a,
+    ue_b = 5,
+};
+
+// no fixed underlying type: the range of values is [0, 15]
+enum plain_enum
+{
+    pe_a,
+    pe_b = 10,
+};
+
 #if defined(__GNUC__) || defined(__clang__)
 struct packed_other_elements
 {
@@ -162,7 +193,7 @@ TEST(field_reflection, concept)
     static_assert(field_countable<my_struct5>);
     static_assert(field_countable<my_struct6>);
     static_assert(field_countable<my_struct7>);
-    static_assert(!field_countable<my_struct8>);
+    static_assert(field_countable<my_struct8> == std_rfl);
     static_assert(field_countable<my_struct9>);
     static_assert(field_countable<named::my_struct10>);
     static_assert(field_countable<my_struct11>);
@@ -181,9 +212,9 @@ TEST(field_reflection, concept)
     static_assert(field_referenceable<my_struct3>);
     static_assert(field_referenceable<my_struct4>);
     static_assert(field_referenceable<my_struct5>);
-    static_assert(!field_referenceable<my_struct6>);
-    static_assert(!field_referenceable<my_struct7>);
-    static_assert(!field_referenceable<my_struct8>);
+    static_assert(field_referenceable<my_struct6> == std_rfl);
+    static_assert(field_referenceable<my_struct7> == std_rfl);
+    static_assert(field_referenceable<my_struct8> == std_rfl);
     static_assert(field_referenceable<my_struct9>);
     static_assert(field_referenceable<named::my_struct10>);
     static_assert(field_referenceable<my_struct11>);
@@ -198,25 +229,45 @@ TEST(field_reflection, concept)
 #endif
 
     static_assert(field_namable<my_struct1>);
-    static_assert(!field_namable<my_struct2>);
-    static_assert(!field_namable<my_struct3>);
+    static_assert(field_namable<my_struct2> == std_rfl);
+    static_assert(field_namable<my_struct3> == std_rfl);
     static_assert(field_namable<my_struct4>);
     static_assert(field_namable<my_struct5>);
-    static_assert(!field_namable<my_struct6>);
-    static_assert(!field_namable<my_struct7>);
-    static_assert(!field_namable<my_struct8>);
+    static_assert(field_namable<my_struct6> == std_rfl);
+    static_assert(field_namable<my_struct7> == std_rfl);
+    static_assert(field_namable<my_struct8> == std_rfl);
     static_assert(field_namable<my_struct9>);
     static_assert(field_namable<named::my_struct10>);
     static_assert(field_namable<my_struct11>);
     static_assert(field_namable<my_struct12>);
     static_assert(field_namable<my_struct13>);
     static_assert(field_namable<my_struct14>);
-    static_assert(!field_namable<my_struct15>);
-    static_assert(!field_namable<std::monostate>);
+    static_assert(field_namable<my_struct15>);
+    static_assert(field_namable<std::monostate>);
 #if defined(__GNUC__) || defined(__clang__)
     static_assert(field_namable<packed_element_size>);
     static_assert(field_namable<packed_const_element>);
 #endif
+
+    // non-class types and tuple-like types are not reflectable
+    static_assert(!field_countable<int>);
+    static_assert(!field_countable<int[3]>);
+    static_assert(!field_countable<my_struct1[3]>);
+    static_assert(!field_countable<my_union>);
+    static_assert(!field_countable<std::array<int, 3>>);
+    static_assert(!field_countable<std::array<int, 0>>);
+    static_assert(!field_countable<std::pair<int, double>>);
+    static_assert(!field_countable<std::tuple<int, double>>);
+    static_assert(!field_countable<std::string>);
+    static_assert(!field_countable<my_enum>);
+
+    // the options only extend the set of types, and the C++20 backend ignores them
+    static_assert(field_namable<my_struct1, reflect_options{}>);
+    static_assert(field_namable<my_struct1, reflect_options{.non_aggregate = true}>);
+    static_assert(field_namable<my_struct1, reflect_options{.non_public = true}>);
+    static_assert(field_namable<my_struct1, reflect_options{.bit_fields = true}>);
+    static_assert(
+        field_namable<my_struct1, reflect_options{.non_aggregate = true, .non_public = true, .bit_fields = true}>);
 }
 
 TEST(field_reflection, field_count)
@@ -228,6 +279,9 @@ TEST(field_reflection, field_count)
     static_assert(field_count<my_struct5> == 1);
     static_assert(field_count<my_struct6> == 5);
     static_assert(field_count<my_struct7> == 6);
+#if FIELD_RFL_STD_REFLECTION
+    static_assert(field_count<my_struct8> == 2);
+#endif
     static_assert(field_count<my_struct9> == 1);
     static_assert(field_count<named::my_struct10> == 2);
     static_assert(field_count<my_struct11> == 2);
@@ -271,6 +325,15 @@ TEST(field_reflection, field_type)
     static_assert(std::is_same_v<field_type<my_struct13, 0>, decltype(std::declval<my_struct13>().value)>);
     static_assert(std::is_same_v<field_type<my_struct14, 0>, decltype(std::declval<my_struct14>().value)>);
 
+#if FIELD_RFL_STD_REFLECTION
+    static_assert(std::is_same_v<field_type<my_struct6, 0>, int>);
+    static_assert(std::is_same_v<field_type<my_struct6, 4>, decltype(std::declval<my_struct1>().map)>);
+    static_assert(std::is_same_v<field_type<my_struct7, 0>, int>);
+    static_assert(std::is_same_v<field_type<my_struct7, 5>, my_struct7::X>);
+    static_assert(std::is_same_v<field_type<my_struct8, 0>, int&&>);
+    static_assert(std::is_same_v<field_type<my_struct8, 1>, double&>);
+#endif
+
     static_assert(all_field_types_are_test_castable<my_struct15>);
     static_assert(all_field_types_are_test_castable<std::monostate>);
 
@@ -302,6 +365,19 @@ TEST(field_reflection, field_name)
     static_assert(field_name<my_struct12, 0> == "value");
     static_assert(field_name<my_struct13, 0> == "value");
     static_assert(field_name<my_struct14, 0> == "value");
+#if FIELD_RFL_STD_REFLECTION
+    static_assert(field_name<my_struct2, 0> == "i");
+    static_assert(field_name<my_struct2, 1> == "d");
+    static_assert(field_name<my_struct3, 0> == "i");
+    static_assert(field_name<my_struct3, 1> == "d");
+    static_assert(field_name<my_struct6, 0> == "i");
+    static_assert(field_name<my_struct6, 4> == "map");
+    static_assert(field_name<my_struct7, 0> == "i");
+    static_assert(field_name<my_struct7, 4> == "map");
+    static_assert(field_name<my_struct7, 5> == "x");
+    static_assert(field_name<my_struct8, 0> == "i");
+    static_assert(field_name<my_struct8, 1> == "d");
+#endif
 #if defined(__GNUC__) || defined(__clang__)
     static_assert(field_name<packed_element_size, 0> == "chif");
     static_assert(field_name<packed_element_size, 1> == "element");
@@ -423,6 +499,52 @@ TEST(field_reflection, get_field)
         static_assert(std::is_same_v<decltype(get_field<0>(ms11)), decltype(ms11.x1)&>);
         static_assert(std::is_same_v<decltype(get_field<1>(ms11)), decltype(ms11.y1)&>);
     }
+
+#if FIELD_RFL_STD_REFLECTION
+    {
+        auto ms7 = my_struct7{};
+        EXPECT_EQ(&get_field<0>(ms7), &ms7.i);
+        EXPECT_EQ(&get_field<4>(ms7), &ms7.map);
+        EXPECT_EQ(&get_field<5>(ms7), &ms7.x);
+        static_assert(std::is_same_v<decltype(get_field<0>(ms7)), int&>);
+        static_assert(std::is_same_v<decltype(get_field<5>(ms7)), my_struct7::X&>);
+        static_assert(std::is_same_v<decltype(get_field<5>(my_struct7{})), my_struct7::X>);
+    }
+
+    {
+        int i = 1;
+        double d = 3.14;
+        auto ms8 = my_struct8{std::move(i), d};
+        EXPECT_EQ(&get_field<0>(ms8), &i);
+        EXPECT_EQ(&get_field<1>(ms8), &d);
+        static_assert(std::is_same_v<decltype(get_field<0>(ms8)), int&>);
+        static_assert(std::is_same_v<decltype(get_field<1>(ms8)), double&>);
+    }
+#endif
+
+#if defined(__GNUC__) || defined(__clang__)
+    {
+        auto pes = packed_element_size{{1, 2}, 3, 4};
+        EXPECT_EQ(get_field<0>(pes).elemento, 2);
+        EXPECT_EQ(get_field<1>(pes), 3U);
+        EXPECT_EQ(get_field<2>(pes), 4U);
+    }
+#endif
+}
+
+TEST(field_reflection, set_field)
+{
+    auto ms1 = my_struct1{};
+    set_field<0>(ms1, 42);
+    set_field<2>(ms1, "abc");
+    EXPECT_EQ(ms1.i, 42);
+    EXPECT_EQ(ms1.hello, "abc");
+
+    int i = 1;
+    double d = 3.14;
+    auto ms2 = my_struct2{i, d};
+    set_field<0>(ms2, 2);
+    EXPECT_EQ(i, 2);
 }
 
 TEST(field_reflection, to_tuple)
@@ -478,6 +600,27 @@ TEST(field_reflection, to_tuple)
 
 TEST(field_reflection, for_each_field)
 {
+    {
+        auto ms1 = my_struct1{};
+        std::string names;
+        for_each_field(ms1, [&](std::string_view name, auto&) {
+            names += name;
+            names += ',';
+        });
+        EXPECT_EQ(names, "i,d,hello,arr,map,");
+    }
+#if FIELD_RFL_STD_REFLECTION
+    {
+        auto ms7 = my_struct7{};
+        std::string names;
+        for_each_field(ms7, [&](std::string_view name, auto&) {
+            names += name;
+            names += ',';
+        });
+        EXPECT_EQ(names, "i,d,hello,arr,map,x,");
+    }
+#endif
+
     auto ms1_a = my_struct1{};
     auto ms1_b = my_struct1{};
     for_each_field(ms1_a, [](auto&) {});
@@ -611,5 +754,70 @@ TEST(field_reflection, any_of_field)
                              [](std::string_view name, std::unique_ptr<int>&& value1, std::unique_ptr<int>&& value2) {
                                  return name == "value" && *value1 == 42 && *value2 == 43;
                              }));
+}
+TEST(field_reflection, enum_api)
+{
+    static_assert(enum_count<my_enum> == 3);
+    static_assert(enum_values<my_enum> == std::array{my_enum::green, my_enum::blue, my_enum::red});
+    static_assert(enum_names<my_enum> == std::array<std::string_view, 3>{"green", "blue", "red"});
+    static_assert(enum_name(my_enum::red) == "red");
+    static_assert(enum_name(my_enum::alias) == "red");
+    static_assert(enum_name(my_enum::green) == "green");
+    static_assert(enum_name(static_cast<my_enum>(100)).empty());
+    static_assert(enum_cast<my_enum>("blue") == my_enum::blue);
+    // the C++20 backend cannot see aliases
+    static_assert(enum_cast<my_enum>("alias") == (std_rfl ? std::optional(my_enum::red) : std::nullopt));
+    static_assert(!enum_cast<my_enum>("yellow").has_value());
+
+    static_assert(enum_count<unscoped_enum> == 2);
+    static_assert(enum_name(ue_b) == "ue_b");
+    static_assert(enum_cast<unscoped_enum>("ue_a") == ue_a);
+
+    static_assert(enum_count<plain_enum> == 2);
+    static_assert(enum_names<plain_enum> == std::array<std::string_view, 2>{"pe_a", "pe_b"});
+    static_assert(enum_name(pe_b) == "pe_b");
+    static_assert(enum_cast<plain_enum>("pe_b") == pe_b);
+
+    EXPECT_EQ(enum_name(my_enum::blue), "blue");
+    EXPECT_EQ(enum_cast<my_enum>("green"), my_enum::green);
+}
+struct with_mutable
+{
+    int i;
+    mutable int m;
+    const int& r;
+};
+TEST(field_reflection, cv_field_type)
+{
+    static_assert(std::is_same_v<field_type<const my_struct1, 0>, const int>);
+    static_assert(std::is_same_v<field_type<const my_struct1, 2>, const std::string>);
+    static_assert(std::is_same_v<field_type<volatile my_struct1, 1>, volatile double>);
+    static_assert(std::is_same_v<field_type<const with_mutable, 0>, const int>);
+    static_assert(std::is_same_v<field_type<const with_mutable, 1>, int>);
+    static_assert(std::is_same_v<field_type<const with_mutable, 2>, const int&>);
+}
+// The explicit template arguments of the previous versions are still accepted.
+TEST(field_reflection, explicit_template_arguments)
+{
+    auto s = my_struct1{};
+    const auto& cs = s;
+    EXPECT_EQ((get_field<0, my_struct1>(s)), 287);
+    EXPECT_EQ((get_field<0, const my_struct1>(cs)), 287);
+    EXPECT_EQ((get_field<2, my_struct1>(my_struct1{})), "Hello World");
+    EXPECT_EQ(std::get<0>(to_tuple<my_struct1&>(s)), 287);
+    std::size_t count = 0;
+    for_each_field<my_struct1&>(s, [&](auto&) { ++count; });
+    EXPECT_EQ(count, field_count<my_struct1>);
+    EXPECT_TRUE((all_of_field<my_struct1&>(s, [](auto&) { return true; })));
+    EXPECT_TRUE((any_of_field<my_struct1&, my_struct1&>(s, s, [](auto&, auto&) { return true; })));
+    set_field<0, my_struct1>(s, 1);
+    EXPECT_EQ(s.i, 1);
+
+    constexpr auto opts = reflect_options{};
+    EXPECT_EQ((get_field<0, opts>(s)), 1);
+    set_field<0, opts>(s, 2);
+    EXPECT_EQ(std::get<0>(to_tuple<opts>(s)), 2);
+    for_each_field<opts>(s, [&](auto&) { ++count; });
+    EXPECT_EQ(count, 2 * field_count<my_struct1>);
 }
 // NOLINTEND

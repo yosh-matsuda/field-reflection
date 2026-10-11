@@ -3,7 +3,10 @@ cmake_minimum_required(VERSION 3.16)
 #
 # COMPILER/LINKER FLAGS
 #
-set(CMAKE_CXX_STANDARD 20)
+# The C++ standard can be overridden, e.g., -DCMAKE_CXX_STANDARD=26 -DCMAKE_CXX_FLAGS=-freflection for C++26 reflection
+if(NOT DEFINED CMAKE_CXX_STANDARD)
+  set(CMAKE_CXX_STANDARD 20)
+endif()
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(ENV{CMAKE_EXPORT_COMPILE_COMMANDS} ON)
@@ -36,7 +39,10 @@ find_package(GTest REQUIRED)
 include_directories(${GTEST_INCLUDE_DIRS})
 
 # executables
-add_executable("${PROJECT_NAME}_test" test.cpp)
+add_executable(
+  "${PROJECT_NAME}_test"
+  test.cpp test_std_reflection.cpp compat/compat_legacy.cpp
+  compat/compat_std.cpp compat/compat_test.cpp)
 target_link_libraries("${PROJECT_NAME}_test"
                       PRIVATE ${PROJECT_NAME} GTest::gtest GTest::gtest_main)
 
