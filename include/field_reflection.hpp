@@ -550,12 +550,6 @@ namespace field_reflection
             {
                 return std::tie();
             }
-            template <typename T, field_referenceable U = std::remove_cvref_t<T>>
-            requires (field_count<U> == 0)
-            constexpr auto to_tuple_impl(T&&)
-            {
-                return std::tie();
-            }
 
 #if defined(_MSC_VER)
 #pragma region TO_TUPLE_TEMPLATE_MACRO
@@ -666,7 +660,6 @@ namespace field_reflection
 #define FIELD_RFL_ID(x) x
 #define FIELD_RFL_ADDR(x) &x
 #define FIELD_RFL_DECLTYPE(x) decltype(x)
-#define FIELD_RFL_FORWARD(x) std::forward<decltype(x)>(x)
 #define FIELD_RFL_SIZEOF(x) sizeof(x)
 // Clang 15 and earlier do not allow structured bindings in requires-expressions.
 #if defined(__clang__) && __clang_major__ < (defined(__apple_build_version__) ? 15 : 16)
@@ -675,28 +668,21 @@ namespace field_reflection
 #define FIELD_RFL_NO_BIT_FIELDS(...) requires { __VA_ARGS__; }
 #endif
 
-#define TO_TUPLE_TEMPLATE(NUM)                                                                            \
-    template <typename T, field_referenceable U = std::remove_cvref_t<T>>                                 \
-    requires (field_count<U> == NUM)                                                                      \
-    constexpr auto to_ptr_tuple(T&& t)                                                                    \
-    {                                                                                                     \
-        auto& [FIELD_RFL_SEQ##NUM(FIELD_RFL_ID)] = t;                                                     \
-        return std::tuple(FIELD_RFL_SEQ##NUM(FIELD_RFL_ADDR));                                            \
-    }                                                                                                     \
-    template <typename T, field_referenceable U = std::remove_cvref_t<T>>                                 \
-    requires (field_count<U> == NUM)                                                                      \
-    constexpr auto to_tuple_impl(T&& t)                                                                   \
-    {                                                                                                     \
-        auto [FIELD_RFL_SEQ##NUM(FIELD_RFL_ID)] = std::forward<T>(t);                                     \
-        return std::tuple<FIELD_RFL_SEQ##NUM(FIELD_RFL_DECLTYPE)>(FIELD_RFL_SEQ##NUM(FIELD_RFL_FORWARD)); \
-    }                                                                                                     \
-    template <decomposable T>                                                                             \
-    requires (field_count<T> == NUM)                                                                      \
-    constexpr auto field_type_tuple()                                                                     \
-    {                                                                                                     \
-        auto&& [FIELD_RFL_SEQ##NUM(FIELD_RFL_ID)] = *field_type_source<T>;                                \
-        return field_type_info<std::tuple<FIELD_RFL_SEQ##NUM(FIELD_RFL_DECLTYPE)>,                        \
-                               FIELD_RFL_NO_BIT_FIELDS(FIELD_RFL_SEQ##NUM(FIELD_RFL_SIZEOF))>{};          \
+#define TO_TUPLE_TEMPLATE(NUM)                                                                   \
+    template <typename T, field_referenceable U = std::remove_cvref_t<T>>                        \
+    requires (field_count<U> == NUM)                                                             \
+    constexpr auto to_ptr_tuple(T&& t)                                                           \
+    {                                                                                            \
+        auto& [FIELD_RFL_SEQ##NUM(FIELD_RFL_ID)] = t;                                            \
+        return std::tuple(FIELD_RFL_SEQ##NUM(FIELD_RFL_ADDR));                                   \
+    }                                                                                            \
+    template <decomposable T>                                                                    \
+    requires (field_count<T> == NUM)                                                             \
+    constexpr auto field_type_tuple()                                                            \
+    {                                                                                            \
+        auto&& [FIELD_RFL_SEQ##NUM(FIELD_RFL_ID)] = *field_type_source<T>;                       \
+        return field_type_info<std::tuple<FIELD_RFL_SEQ##NUM(FIELD_RFL_DECLTYPE)>,               \
+                               FIELD_RFL_NO_BIT_FIELDS(FIELD_RFL_SEQ##NUM(FIELD_RFL_SIZEOF))>{}; \
     }
 
             // clang-format off
@@ -823,7 +809,6 @@ namespace field_reflection
 #undef FIELD_RFL_ID
 #undef FIELD_RFL_ADDR
 #undef FIELD_RFL_DECLTYPE
-#undef FIELD_RFL_FORWARD
 #undef FIELD_RFL_SIZEOF
 #undef FIELD_RFL_NO_BIT_FIELDS
 #undef TO_TUPLE_TEMPLATE
@@ -1149,13 +1134,24 @@ namespace field_reflection
             concept field_assignable =
                 requires(T& t, V&& value) { *std::get<N>(to_ptr_tuple(t)) = std::forward<V>(value); };
 
-            // to_tuple copies or moves the whole object to decompose it.
+            // Argument from which to_tuple constructs the element for the N-th field
+            template <typename T, std::size_t N, reflect_options O>
+            using to_tuple_arg_t =
+                std::conditional_t<std::is_rvalue_reference_v<T&&>,
+                                   decltype(forward_member<std::remove_cvref_t<T>, N>(
+                                       std::get<N>(to_ptr_tuple(std::declval<T&>())))),
+                                   std::conditional_t<std::is_rvalue_reference_v<field_type<std::remove_cvref_t<T>, N>>,
+                                                      field_type<std::remove_cvref_t<T>, N>,
+                                                      decltype(*std::get<N>(to_ptr_tuple(std::declval<T&>())))>>;
+
             template <typename T, reflect_options O>
             consteval bool to_tuple_supported()
             {
                 using U = std::remove_cvref_t<T>;
-                return std::is_constructible_v<U, T&&> && []<std::size_t... Is>(std::index_sequence<Is...>) {
-                    return (!std::is_array_v<field_type<U, Is>> && ...);
+                return []<std::size_t... Is>(std::index_sequence<Is...>) {
+                    return ((!std::is_array_v<field_type<U, Is>> &&
+                             std::is_constructible_v<field_type<U, Is>, to_tuple_arg_t<T, Is, O>>) &&
+                            ...);
                 }(std::make_index_sequence<field_reflection::field_count<U, O>>());
             }
         }  // namespace detail
@@ -1192,7 +1188,11 @@ namespace field_reflection
         requires (detail::to_tuple_supported<T, O>())
         constexpr auto to_tuple(T&& t)
         {
-            return detail::to_tuple_impl(std::forward<T>(t));
+            return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+                [[maybe_unused]] auto ptrs = detail::to_ptr_tuple(t);
+                return std::tuple<field_type<U, Is, O>...>(
+                    static_cast<detail::to_tuple_arg_t<T, Is, O>>(*std::get<Is>(ptrs))...);
+            }(std::make_index_sequence<field_count<U, O>>());
         }
 #else
         namespace detail
