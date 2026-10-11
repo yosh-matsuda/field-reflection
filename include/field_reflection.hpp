@@ -119,8 +119,29 @@ namespace field_reflection
 #endif
         }
 
+        // A copy of a string evaluated at compile time. Referring to the copy instead of a part of the function
+        // name keeps the function name out of the binary.
+        template <std::size_t N>
+        struct static_string
+        {
+            std::array<char, N + 1> chars;
+
+            constexpr std::string_view view() const noexcept { return {chars.data(), N}; }
+        };
+
+        template <std::size_t N>
+        consteval static_string<N> make_static_string(std::string_view s)
+        {
+            auto result = static_string<N>{};
+            std::copy_n(s.begin(), N, result.chars.begin());
+            return result;
+        }
+
         template <class T>
-        constexpr std::string_view type_name = get_type_name<T>();
+        constexpr auto type_name_storage = make_static_string<get_type_name<T>().size()>(get_type_name<T>());
+
+        template <class T>
+        constexpr std::string_view type_name = type_name_storage<T>.view();
     }  // namespace detail_common
 
     using detail_common::type_name;
@@ -886,7 +907,12 @@ namespace field_reflection
             }
 
             template <field_namable T, std::size_t N>
-            constexpr std::string_view field_name = get_field_name<T, get_ptr<T, N>()>();
+            constexpr auto field_name_storage =
+                detail_common::make_static_string<get_field_name<T, get_ptr<T, N>()>().size()>(
+                    get_field_name<T, get_ptr<T, N>()>());
+
+            template <field_namable T, std::size_t N>
+            constexpr std::string_view field_name = field_name_storage<T, N>.view();
 
             template <field_referenceable T, std::size_t N>
             using field_type = std::tuple_element_t<N, typename decltype(field_type_tuple<T>())::type>;
@@ -1034,13 +1060,38 @@ namespace field_reflection
                 return values;
             }();
 
+            // The names of the enumerators of E concatenated with null terminators.
+            template <typename E>
+            constexpr auto enum_name_chars = []() {
+                constexpr auto size = []() {
+                    std::size_t n = 0;
+                    for (const auto name : enum_names_in_range<E>)
+                    {
+                        if (!name.empty()) n += name.size() + 1;
+                    }
+                    return n;
+                }();
+                std::array<char, size> chars{};
+                std::size_t k = 0;
+                for (const auto name : enum_names_in_range<E>)
+                {
+                    if (name.empty()) continue;
+                    std::copy_n(name.begin(), name.size(), chars.begin() + k);
+                    k += name.size() + 1;
+                }
+                return chars;
+            }();
+
             template <typename E>
             constexpr auto enum_names_value = []() {
                 std::array<std::string_view, enum_count_value<E>> names{};
                 std::size_t k = 0;
+                std::size_t offset = 0;
                 for (const auto name : enum_names_in_range<E>)
                 {
-                    if (!name.empty()) names[k++] = name;
+                    if (name.empty()) continue;
+                    names[k++] = std::string_view(enum_name_chars<E>.data() + offset, name.size());
+                    offset += name.size() + 1;
                 }
                 return names;
             }();
