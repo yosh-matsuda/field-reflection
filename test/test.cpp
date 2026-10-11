@@ -873,4 +873,46 @@ TEST(field_reflection, c_array_members)
     });
     EXPECT_EQ(*moved, 5);
 }
+struct constexpr_struct
+{
+    int i;
+    double d;
+    int a[2];
+};
+struct constexpr_pair
+{
+    int i;
+    double d;
+};
+TEST(field_reflection, constexpr_api)
+{
+    constexpr auto c = constexpr_struct{1, 2.0, {3, 4}};
+    static_assert(get_field<0>(c) == 1);
+    static_assert(get_field<2>(c)[1] == 4);
+    static_assert(get_field<1>(constexpr_struct{1, 2.0, {3, 4}}) == 2.0);
+    static_assert(std::get<1>(to_tuple(constexpr_pair{1, 2.0})) == 2.0);
+    static_assert([] {
+        auto p = constexpr_pair{1, 2.0};
+        return std::get<0>(to_tuple(p));
+    }() == 1);
+    static_assert([] {
+        auto s = constexpr_struct{};
+        set_field<0>(s, 5);
+        get_field<1>(s) = 6.0;
+        auto sum = 0.0;
+        for_each_field(s, [&](auto& f) {
+            if constexpr (std::is_arithmetic_v<std::remove_cvref_t<decltype(f)>>) sum += f;
+        });
+        for_each_field(std::move(s), [&](std::string_view name, auto&& f) {
+            if constexpr (std::is_array_v<std::remove_cvref_t<decltype(f)>>) sum += static_cast<double>(name.size());
+        });
+        return sum;
+    }() == 12.0);
+    static_assert(all_of_field(c, c, [](const auto& x, const auto& y) { return &x == &y; }));
+    static_assert(any_of_field(c, [](std::string_view name, const auto&) { return name == "d"; }));
+    static_assert(field_name<constexpr_struct, 2> == "a");
+    static_assert(type_name<constexpr_struct> == "constexpr_struct");
+    static_assert(enum_name(my_enum::blue) == "blue");
+    static_assert(enum_cast<my_enum>("red") == my_enum::red);
+}
 // NOLINTEND
