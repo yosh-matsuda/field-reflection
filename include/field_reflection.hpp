@@ -238,6 +238,58 @@ namespace field_reflection
                 requires std::is_base_of_v<U, T>
                 constexpr operator U() const&& noexcept;  // NOLINT
             };
+
+            // Whether U is the type of an anonymous union or struct member of T, judged by the name of U.
+            template <typename U, typename T>
+            consteval bool is_anonymous_member_type_of()
+            {
+                constexpr auto name = detail_common::get_type_name<U>();
+#if defined(__clang__) || defined(__GNUC__)
+#if defined(__clang__)
+                // "T::(anonymous union at file:line:column)"
+                constexpr auto markers =
+                    std::array{std::string_view("::(anonymous union at "), std::string_view("::(anonymous struct at ")};
+#else
+                // "T::<unnamed union>". A named member of an unnamed class has the type of the same name, but the
+                // copy constructor of the type of an anonymous member is inaccessible.
+                if constexpr (!std::is_trivially_copyable_v<U> || std::is_copy_constructible_v<U>)
+                {
+                    return false;
+                }
+                constexpr auto markers =
+                    std::array{std::string_view("::<unnamed union>"), std::string_view("::<unnamed struct>")};
+#endif
+                for (auto marker : markers)
+                {
+                    if (auto pos = name.rfind(marker); pos != std::string_view::npos)
+                    {
+                        return name.substr(0, pos) == detail_common::get_type_name<T>();
+                    }
+                }
+                return false;
+#else
+                // "union " or "" (for "struct ") without the name of the enclosing class. A named member of an
+                // unnamed class has the type named "T::<unnamed-type-member>".
+                return name.empty() || name == "union ";
+#endif
+            }
+
+            template <typename U, typename T>
+            concept anonymous_member_type_of = (std::is_union_v<U> || (std::is_class_v<U> && std::is_aggregate_v<U>)) &&
+                                               is_anonymous_member_type_of<U, T>();
+
+            struct no_conversion
+            {
+            };
+
+            // Converted to a prvalue so as not to copy the type, whose copy constructor is inaccessible in GCC.
+            template <typename T>
+            struct any_anonymous
+            {
+                template <typename U>
+                requires anonymous_member_type_of<U, T>
+                constexpr operator U() const&& noexcept;  // NOLINT
+            };
 #if defined(__GNUC__) || defined(__clang__)
 #pragma GCC diagnostic pop
 #endif
@@ -355,6 +407,12 @@ namespace field_reflection
                 {
                     return max_args;
                 }
+                // The count is less than the number of members if the next member cannot be initialized by the
+                // argument of any type but by `{}`, e.g., if it has a deleted constructor template.
+                else if constexpr (constructible_with_nested<T, max_args, 0, 0>)
+                {
+                    return std::numeric_limits<std::size_t>::max();
+                }
                 // Fast path: a braced list initializes exactly one member without brace elision, so T has no C
                 // array members if each of the initializers in braces initializes T.
                 else if constexpr ([]<std::size_t... Is>(std::index_sequence<Is...>) {
@@ -376,18 +434,87 @@ namespace field_reflection
             template <field_countable T>
             constexpr std::size_t field_count = field_count_value<T>;
 
+            // T{arg x L, Mid, arg x R}
+            template <typename T, typename Mid, std::size_t L, std::size_t R>
+            concept constructible_with_mid =
+                []<std::size_t... Ls, std::size_t... Rs>(std::index_sequence<Ls...>, std::index_sequence<Rs...>) {
+                    if constexpr (std::is_copy_constructible_v<T>)
+                    {
+                        return requires { T{any_lref<T, Ls>()..., std::declval<Mid>(), any_lref<T, Rs>()...}; };
+                    }
+                    else
+                    {
+                        return requires { T{any_rref<T, Ls>()..., std::declval<Mid>(), any_rref<T, Rs>()...}; };
+                    }
+                }(std::make_index_sequence<L>(), std::make_index_sequence<R>());
+
+            // Whether the I-th of the N initializers of T initializes an anonymous union or struct member. The
+            // argument converted only to such a type initializes the member, but the argument of a type without
+            // conversions does not, which excludes a member of a type constructible from anything.
+            template <typename T, std::size_t I, std::size_t N>
+            concept anonymous_member_at = constructible_with_mid<T, any_anonymous<T>, I, N - I - 1> &&
+                                          (!constructible_with_mid<T, no_conversion, I, N - I - 1>);
+
+            // Structured bindings cannot decompose a class with an anonymous union or struct member.
+#if defined(__has_builtin)
+#if __has_builtin(__builtin_structured_binding_size)
+#define FIELD_RFL_HAS_STRUCTURED_BINDING_SIZE
+#endif
+#endif
+            // A variable template caches the result, while a lambda expression in a concept is instantiated again
+            // whenever the constraints of an overload are checked.
             template <typename T>
-            concept field_referenceable = field_countable<T> && (!has_base<T>);
+            constexpr bool is_decomposable = []() {
+#if defined(FIELD_RFL_HAS_STRUCTURED_BINDING_SIZE)
+                if constexpr (requires { __builtin_structured_binding_size(T); })
+                {
+                    return __builtin_structured_binding_size(T) == field_count<T>;
+                }
+                else
+                {
+                    return false;
+                }
+#else
+                return []<std::size_t... Is>(std::index_sequence<Is...>) {
+                    return !(anonymous_member_at<T, Is, sizeof...(Is)> || ...);
+                }(std::make_index_sequence<field_count_impl<T, 0>>());
+#endif
+            }();
+#undef FIELD_RFL_HAS_STRUCTURED_BINDING_SIZE
+
+            template <typename T>
+            concept decomposable = field_countable<T> && (!has_base<T>) && is_decomposable<T>;
+
+            template <typename T, bool NoBitFields>
+            struct field_type_info
+            {
+                using type = T;
+                static constexpr bool no_bit_fields = NoBitFields;
+            };
+
+            template <decomposable T>
+            constexpr auto field_type_tuple()
+            {
+                static_assert(always_false<T>, "The supported maximum number of fields in struct must be <= 100.");
+            }
+            template <decomposable T>
+            requires (field_count<T> == 0)
+            constexpr auto field_type_tuple()
+            {
+                return field_type_info<std::tuple<>, true>{};
+            }
+
+            // Bit-fields are not referenceable. Defined after the overloads of field_type_tuple.
+            template <decomposable T>
+            struct field_type_info_of;
+
+            template <typename T>
+            concept field_referenceable = decomposable<T> && field_type_info_of<T>::no_bit_fields;
 
             template <typename T, field_referenceable U = std::remove_cvref_t<T>>
             constexpr auto to_ptr_tuple(T&&)
             {
                 static_assert(always_false<U>, "The supported maximum number of fields in struct must be <= 100.");
-            }
-            template <field_referenceable T>
-            constexpr auto field_type_tuple()
-            {
-                static_assert(always_false<T>, "The supported maximum number of fields in struct must be <= 100.");
             }
             template <typename T>
             inline T* field_type_source = nullptr;
@@ -402,12 +529,6 @@ namespace field_reflection
             constexpr auto to_tuple_impl(T&&)
             {
                 return std::tie();
-            }
-            template <field_referenceable T>
-            requires (field_count<T> == 0)
-            constexpr auto field_type_tuple()
-            {
-                return std::type_identity<std::tuple<>>{};
             }
 
 #pragma region TO_TUPLE_TEMPLATE_MACRO
@@ -444,32 +565,40 @@ namespace field_reflection
 #define FIELD_RFL_MAP_LIST(f, ...) FIELD_RFL_EVAL(FIELD_RFL_MAP_LIST1(f, __VA_ARGS__, ()()(), ()()(), ()()(), 0))
 
 #define FIELD_RFL_ADDR(x) &x
+#define FIELD_RFL_NOT_BIT_FIELD(x) sizeof(x);
+// Clang 15 and earlier do not allow structured bindings in requires-expressions.
+#if defined(__clang__) && __clang_major__ < (defined(__apple_build_version__) ? 15 : 16)
+#define FIELD_RFL_NO_BIT_FIELDS(...) true
+#else
+#define FIELD_RFL_NO_BIT_FIELDS(...) requires { FIELD_RFL_MAP(FIELD_RFL_NOT_BIT_FIELD, __VA_ARGS__) }
+#endif
 #define FIELD_RFL_DECLTYPE(x) decltype(x)
 #define FIELD_RFL_FORWARD(x) std::forward<decltype(x)>(x)
 #define FIELD_RFL_FIELD_TYPE(x) decltype(x)
 
-#define TO_TUPLE_TEMPLATE(NUM, ...)                                                                     \
-    template <typename T, field_referenceable U = std::remove_cvref_t<T>>                               \
-    requires (field_count<U> == NUM)                                                                    \
-    constexpr auto to_ptr_tuple(T&& t)                                                                  \
-    {                                                                                                   \
-        auto& [__VA_ARGS__] = t;                                                                        \
-        return std::tuple(FIELD_RFL_MAP_LIST(FIELD_RFL_ADDR, __VA_ARGS__));                             \
-    }                                                                                                   \
-    template <typename T, field_referenceable U = std::remove_cvref_t<T>>                               \
-    requires (field_count<U> == NUM)                                                                    \
-    constexpr auto to_tuple_impl(T&& t)                                                                 \
-    {                                                                                                   \
-        auto [__VA_ARGS__] = std::forward<T>(t);                                                        \
-        return std::tuple<FIELD_RFL_MAP_LIST(FIELD_RFL_DECLTYPE, __VA_ARGS__)>(                         \
-            FIELD_RFL_MAP_LIST(FIELD_RFL_FORWARD, __VA_ARGS__));                                        \
-    }                                                                                                   \
-    template <field_referenceable T>                                                                    \
-    requires (field_count<T> == NUM)                                                                    \
-    constexpr auto field_type_tuple()                                                                   \
-    {                                                                                                   \
-        auto&& [__VA_ARGS__] = *field_type_source<T>;                                                   \
-        return std::type_identity<std::tuple<FIELD_RFL_MAP_LIST(FIELD_RFL_FIELD_TYPE, __VA_ARGS__)>>{}; \
+#define TO_TUPLE_TEMPLATE(NUM, ...)                                                               \
+    template <typename T, field_referenceable U = std::remove_cvref_t<T>>                         \
+    requires (field_count<U> == NUM)                                                              \
+    constexpr auto to_ptr_tuple(T&& t)                                                            \
+    {                                                                                             \
+        auto& [__VA_ARGS__] = t;                                                                  \
+        return std::tuple(FIELD_RFL_MAP_LIST(FIELD_RFL_ADDR, __VA_ARGS__));                       \
+    }                                                                                             \
+    template <typename T, field_referenceable U = std::remove_cvref_t<T>>                         \
+    requires (field_count<U> == NUM)                                                              \
+    constexpr auto to_tuple_impl(T&& t)                                                           \
+    {                                                                                             \
+        auto [__VA_ARGS__] = std::forward<T>(t);                                                  \
+        return std::tuple<FIELD_RFL_MAP_LIST(FIELD_RFL_DECLTYPE, __VA_ARGS__)>(                   \
+            FIELD_RFL_MAP_LIST(FIELD_RFL_FORWARD, __VA_ARGS__));                                  \
+    }                                                                                             \
+    template <decomposable T>                                                                     \
+    requires (field_count<T> == NUM)                                                              \
+    constexpr auto field_type_tuple()                                                             \
+    {                                                                                             \
+        auto&& [__VA_ARGS__] = *field_type_source<T>;                                             \
+        return field_type_info<std::tuple<FIELD_RFL_MAP_LIST(FIELD_RFL_FIELD_TYPE, __VA_ARGS__)>, \
+                               FIELD_RFL_NO_BIT_FIELDS(__VA_ARGS__)>{};                           \
     }
 
             TO_TUPLE_TEMPLATE(1, p0)
@@ -797,6 +926,11 @@ namespace field_reflection
                               p55, p56, p57, p58, p59, p60, p61, p62, p63, p64, p65, p66, p67, p68, p69, p70, p71, p72,
                               p73, p74, p75, p76, p77, p78, p79, p80, p81, p82, p83, p84, p85, p86, p87, p88, p89, p90,
                               p91, p92, p93, p94, p95, p96, p97, p98, p99)
+
+            template <decomposable T>
+            struct field_type_info_of : decltype(field_type_tuple<T>())
+            {
+            };
 #undef FIELD_RFL_EVAL0
 #undef FIELD_RFL_EVAL1
 #undef FIELD_RFL_EVAL2
@@ -824,6 +958,8 @@ namespace field_reflection
 #undef FIELD_RFL_FIELD_TYPE
 #undef FIELD_RFL_FORWARD
 #undef FIELD_RFL_ADDR
+#undef FIELD_RFL_NOT_BIT_FIELD
+#undef FIELD_RFL_NO_BIT_FIELDS
 #undef FIELD_RFL_MOVE
 #undef TO_TUPLE_TEMPLATE
 #pragma endregion TO_TUPLE_TEMPLATE_MACRO
@@ -881,8 +1017,14 @@ namespace field_reflection
 #endif
             }
 
-            template <typename T, auto Ptr>
-            consteval std::string_view get_field_name()
+            struct field_name_affixes
+            {
+                std::string_view suffix;
+                char begin_sentinel;
+            };
+
+            // A local class of a non-template function is a single type, which is reflected only once.
+            consteval field_name_affixes get_field_name_affixes()
             {
                 struct field_name_detector
                 {
@@ -892,8 +1034,16 @@ namespace field_reflection
                 constexpr auto detector_name =
                     get_function_name<field_name_detector, get_ptr<field_name_detector, 0>()>();
                 constexpr auto dummy_begin = detector_name.rfind(std::string_view("dummy"));
-                constexpr auto suffix = detector_name.substr(dummy_begin + std::string_view("dummy").size());
-                constexpr auto begin_sentinel = detector_name[dummy_begin - 1];
+                return {detector_name.substr(dummy_begin + std::string_view("dummy").size()),
+                        detector_name[dummy_begin - 1]};
+            }
+
+            template <typename T, auto Ptr>
+            consteval std::string_view get_field_name()
+            {
+                constexpr auto affixes = get_field_name_affixes();
+                constexpr auto suffix = affixes.suffix;
+                constexpr auto begin_sentinel = affixes.begin_sentinel;
 
                 const auto field_name_raw = get_function_name<T, Ptr>();
                 const auto last = field_name_raw.rfind(suffix);

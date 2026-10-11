@@ -873,6 +873,100 @@ TEST(field_reflection, c_array_members)
     });
     EXPECT_EQ(*moved, 5);
 }
+struct bit_field_members
+{
+    int a : 3;
+    int b;
+    std::string s;
+};
+struct anonymous_union_member
+{
+    int tag;
+    union
+    {
+        int i;
+        float f;
+    };
+};
+#if defined(__GNUC__) || defined(__clang__)
+struct anonymous_struct_member
+{
+    int tag;
+    struct
+    {
+        int x;
+        int y;
+    };
+};
+#endif
+struct unnamed_type_members
+{
+    int tag;
+    union
+    {
+        int i;
+        float f;
+    } u;
+    struct
+    {
+        int x;
+    } s;
+};
+struct not_convertible
+{
+    not_convertible() = default;
+    template <typename U>
+    not_convertible(U) = delete;
+};
+struct not_convertible_member
+{
+    int a;
+    not_convertible n;
+    int b;
+};
+template <typename T>
+constexpr bool uncountable_or_count_is(std::size_t n)
+{
+    if constexpr (field_countable<T>)
+    {
+        return field_count<T> == n;
+    }
+    else
+    {
+        return true;
+    }
+}
+TEST(field_reflection, unsupported_members)
+{
+    // Not referenceable, without compile errors. Clang 15 and earlier cannot detect bit-fields.
+#if !defined(__clang__) || __clang_major__ >= (defined(__apple_build_version__) ? 15 : 16)
+    static_assert(field_countable<bit_field_members>);
+    static_assert(field_count<bit_field_members> == 3);
+    static_assert(!field_referenceable<bit_field_members>);
+    static_assert(!field_namable<bit_field_members>);
+    static_assert(field_namable<bit_field_members, reflect_options{.bit_fields = true}> == std_rfl);
+#endif
+
+    // GCC 11 and 12 do not count the anonymous member
+    static_assert(uncountable_or_count_is<anonymous_union_member>(2));
+    static_assert(field_referenceable<anonymous_union_member> == std_rfl);
+    static_assert(!field_namable<anonymous_union_member>);
+#if defined(__GNUC__) || defined(__clang__)
+    static_assert(uncountable_or_count_is<anonymous_struct_member>(2));
+    static_assert(field_referenceable<anonymous_struct_member> == std_rfl);
+    static_assert(!field_namable<anonymous_struct_member>);
+#endif
+
+    // The members of unnamed classes are not anonymous
+    static_assert(field_namable<unnamed_type_members>);
+    static_assert(field_count<unnamed_type_members> == 3);
+    static_assert(field_name<unnamed_type_members, 1> == "u");
+    static_assert(field_name<unnamed_type_members, 2> == "s");
+
+    // The C++20 backend cannot count the members of a type that is not initialized by the argument of any type
+    static_assert(field_countable<not_convertible_member> == std_rfl);
+    static_assert(field_namable<not_convertible_member> == std_rfl);
+}
 struct constexpr_struct
 {
     int i;
