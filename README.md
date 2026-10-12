@@ -138,12 +138,15 @@ The libraries are Boost.PFR at commit `562a0cb`, magic_enum at commit `5de969c`,
 
 ## Requirements
 
-| Backend | Compilers |
-| --- | --- |
-| C++20 | GCC 11 or later; Clang 15 or later (libc++ 16 or later if you use libc++); MSVC 19.37 (Visual Studio 2022 17.7) or later, including clang-cl 17 or later |
-| C++26 | GCC 16 or later with `-std=c++26 -freflection` |
+| Compiler | C++20 backend | C++26 backend |
+| --- | --- | --- |
+| GCC | 11 or later | 16 or later, with `-std=c++26 -freflection` |
+| Clang | 15 or later | – |
+| MSVC | 19.37 (Visual Studio 2022 17.7) or later | – |
+| clang-cl | 17 or later | – |
 
-With MSVC, the standard-conforming preprocessor (`/Zc:preprocessor`) is required. The CMake target adds it automatically; add it yourself if you use the header without CMake.
+* With Clang and libc++, libc++ 16 or later is required.
+* With MSVC, the standard-conforming preprocessor (`/Zc:preprocessor`) is required. The CMake target adds it automatically; add it yourself if you use the header without CMake.
 
 The C++20 backend reflects at most 100 fields, does not reflect classes with base classes, and finds the enumerators only in the range [-128, 128] by default. See [Known limitations of the C++20 backend](#known-limitations-of-the-c20-backend) and [Backends](#backends).
 
