@@ -518,38 +518,32 @@ namespace field_reflection
                 static constexpr bool no_bit_fields = NoBitFields;
             };
 
-            template <decomposable T>
-            constexpr auto field_type_tuple()
-            {
-                static_assert(always_false<T>, "The supported maximum number of fields in struct must be <= 100.");
-            }
-            template <decomposable T>
-            requires (field_count<T> == 0)
-            constexpr auto field_type_tuple()
-            {
-                return field_type_info<std::tuple<>, true>{};
-            }
-
-            // Bit-fields are not referenceable. Defined after the overloads of field_type_tuple.
-            template <decomposable T>
-            struct field_type_info_of;
-
-            template <typename T>
-            concept field_referenceable = decomposable<T> && field_type_info_of<T>::no_bit_fields;
-
-            template <typename T, field_referenceable U = std::remove_cvref_t<T>>
-            constexpr auto to_ptr_tuple(T&&)
-            {
-                static_assert(always_false<U>, "The supported maximum number of fields in struct must be <= 100.");
-            }
             template <typename T>
             inline T* field_type_source = nullptr;
-            template <typename T, field_referenceable U = std::remove_cvref_t<T>>
-            requires (field_count<U> == 0)
-            constexpr auto to_ptr_tuple(T&&)
+
+            // The functions that decompose an object of N fields. A specialization for each N is selected directly,
+            // which is much faster than overload resolution among the constrained overloads for all N.
+            template <std::size_t N>
+            struct decomposer
             {
-                return std::tie();
-            }
+                static_assert(N <= macro_max_fields_count,
+                              "The supported maximum number of fields in struct must be <= 100.");
+            };
+
+            template <>
+            struct decomposer<0>
+            {
+                template <typename T>
+                static constexpr auto ptrs(T&) noexcept
+                {
+                    return std::tie();
+                }
+                template <typename T>
+                static constexpr auto types() noexcept
+                {
+                    return field_type_info<std::tuple<>, true>{};
+                }
+            };
 
 #if defined(_MSC_VER)
 #pragma region TO_TUPLE_TEMPLATE_MACRO
@@ -668,22 +662,24 @@ namespace field_reflection
 #define FIELD_RFL_NO_BIT_FIELDS(...) requires { __VA_ARGS__; }
 #endif
 
-#define TO_TUPLE_TEMPLATE(NUM)                                                                   \
-    template <typename T, field_referenceable U = std::remove_cvref_t<T>>                        \
-    requires (field_count<U> == NUM)                                                             \
-    constexpr auto to_ptr_tuple(T&& t)                                                           \
-    {                                                                                            \
-        auto& [FIELD_RFL_SEQ##NUM(FIELD_RFL_ID)] = t;                                            \
-        return std::tuple(FIELD_RFL_SEQ##NUM(FIELD_RFL_ADDR));                                   \
-    }                                                                                            \
-    template <decomposable T>                                                                    \
-    requires (field_count<T> == NUM)                                                             \
-    constexpr auto field_type_tuple()                                                            \
-    {                                                                                            \
-        auto&& [FIELD_RFL_SEQ##NUM(FIELD_RFL_ID)] = *field_type_source<T>;                       \
-        return field_type_info<std::tuple<FIELD_RFL_SEQ##NUM(FIELD_RFL_DECLTYPE)>,               \
-                               FIELD_RFL_NO_BIT_FIELDS(FIELD_RFL_SEQ##NUM(FIELD_RFL_SIZEOF))>{}; \
-    }
+#define TO_TUPLE_TEMPLATE(NUM)                                                                       \
+    template <>                                                                                      \
+    struct decomposer<NUM>                                                                           \
+    {                                                                                                \
+        template <typename T>                                                                        \
+        static constexpr auto ptrs(T& t) noexcept                                                    \
+        {                                                                                            \
+            auto& [FIELD_RFL_SEQ##NUM(FIELD_RFL_ID)] = t;                                            \
+            return std::tuple(FIELD_RFL_SEQ##NUM(FIELD_RFL_ADDR));                                   \
+        }                                                                                            \
+        template <typename T>                                                                        \
+        static constexpr auto types() noexcept                                                       \
+        {                                                                                            \
+            auto&& [FIELD_RFL_SEQ##NUM(FIELD_RFL_ID)] = *field_type_source<T>;                       \
+            return field_type_info<std::tuple<FIELD_RFL_SEQ##NUM(FIELD_RFL_DECLTYPE)>,               \
+                                   FIELD_RFL_NO_BIT_FIELDS(FIELD_RFL_SEQ##NUM(FIELD_RFL_SIZEOF))>{}; \
+        }                                                                                            \
+    };
 
             // clang-format off
             TO_TUPLE_TEMPLATE(1) TO_TUPLE_TEMPLATE(2) TO_TUPLE_TEMPLATE(3) TO_TUPLE_TEMPLATE(4) TO_TUPLE_TEMPLATE(5) TO_TUPLE_TEMPLATE(6) TO_TUPLE_TEMPLATE(7) TO_TUPLE_TEMPLATE(8)
@@ -701,10 +697,26 @@ namespace field_reflection
             TO_TUPLE_TEMPLATE(97) TO_TUPLE_TEMPLATE(98) TO_TUPLE_TEMPLATE(99) TO_TUPLE_TEMPLATE(100)
 
             template <decomposable T>
+            constexpr auto field_type_tuple()
+            {
+                return decomposer<field_count<T>>::template types<T>();
+            }
+            // clang-format on
+
+            // Bit-fields are not referenceable.
+            template <decomposable T>
             struct field_type_info_of : decltype(field_type_tuple<T>())
             {
             };
-            // clang-format on
+
+            template <typename T>
+            concept field_referenceable = decomposable<T> && field_type_info_of<T>::no_bit_fields;
+
+            template <typename T, field_referenceable U = std::remove_cvref_t<T>>
+            constexpr auto to_ptr_tuple(T&& t) noexcept
+            {
+                return decomposer<field_count<U>>::ptrs(t);
+            }
 
 #undef FIELD_RFL_SEQ1
 #undef FIELD_RFL_SEQ2
@@ -890,16 +902,30 @@ namespace field_reflection
                         detector_name[dummy_begin - 1]};
             }
 
+            // The affixes are evaluated once, rather than in each get_field_name.
+            inline constexpr field_name_affixes field_name_affixes_value = get_field_name_affixes();
+
             template <typename T, auto Ptr>
             consteval std::string_view get_field_name()
             {
-                constexpr auto affixes = get_field_name_affixes();
-                constexpr auto suffix = affixes.suffix;
-                constexpr auto begin_sentinel = affixes.begin_sentinel;
+                constexpr auto suffix = field_name_affixes_value.suffix;
+                constexpr auto begin_sentinel = field_name_affixes_value.begin_sentinel;
 
+                // The suffix is usually at the end of the function name. The characters are compared in plain
+                // loops, which are evaluated faster than std::string_view::rfind.
                 const auto field_name_raw = get_function_name<T, Ptr>();
-                const auto last = field_name_raw.rfind(suffix);
-                const auto begin = field_name_raw.rfind(begin_sentinel, last - 1) + 1;
+                const char* const chars = field_name_raw.data();
+                auto last = field_name_raw.size() - suffix.size();
+                for (std::size_t k = 0; k < suffix.size(); ++k)
+                {
+                    if (chars[last + k] != suffix[k])
+                    {
+                        last = field_name_raw.rfind(suffix);
+                        break;
+                    }
+                }
+                auto begin = last;
+                while (begin > 0 && chars[begin - 1] != begin_sentinel) --begin;
 
                 assert(begin < field_name_raw.size());
                 assert(last <= field_name_raw.size());
@@ -908,10 +934,13 @@ namespace field_reflection
                 return field_name_raw.substr(begin, last - begin);
             }
 
+            // The name is parsed once and copied, so that the function name is not kept in the program.
+            template <field_namable T, std::size_t N>
+            constexpr std::string_view field_name_raw = get_field_name<T, get_ptr<T, N>()>();
+
             template <field_namable T, std::size_t N>
             constexpr auto field_name_storage =
-                detail_common::make_static_string<get_field_name<T, get_ptr<T, N>()>().size()>(
-                    get_field_name<T, get_ptr<T, N>()>());
+                detail_common::make_static_string<field_name_raw<T, N>.size()>(field_name_raw<T, N>);
 
             template <field_namable T, std::size_t N>
             constexpr std::string_view field_name = field_name_storage<T, N>.view();
