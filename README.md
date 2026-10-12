@@ -101,9 +101,16 @@ field-reflection is not a serialization library. For JSON, see [cpp-yyjson](http
 
 ### Performance
 
-**Run time.** At `-O2`, `for_each_field` and `all_of_field` compile to the same instructions as hand-written member access with GCC 15, GCC 16, and Clang 22 (up to the order of independent instructions). `enum_name` finds a name by an index if the values of the enumerators are consecutive, and by a binary search otherwise.
+* **Run time.** At `-O2`, `for_each_field` and `all_of_field` compile to the same instructions as hand-written member access (up to the order of independent instructions). `enum_name` finds a name by an index if the values of the enumerators are consecutive, and by a binary search otherwise.
+* **Compile time.** A struct with 8 fields adds 19–23 ms, about the same as Boost.PFR. An enum with 10 enumerators adds 9–14 ms, less than enchantum (16–18 ms) and magic_enum (17–102 ms). Including the header takes 0.23–0.34 s.
+* **Binary size.** A program contains only the names that it uses, and no function signatures from the reflection machinery. A struct adds about the same size as with Boost.PFR. An enum with 10 enumerators adds 221–271 B, less than enchantum (375–525 B) and magic_enum (736–857 B).
 
-**Compile time.** Each reflected type adds a fixed time to the compilation. The table shows the time added per type, i.e., the slope between 10 and 200 types in one translation unit (`-c -O0`, best of 3, x86-64 Linux):
+The results are for GCC 15 and Clang 22 in C++20, and GCC 16 in C++26 with `-freflection`, on x86-64 Linux.
+
+<details>
+<summary>Measurement details</summary>
+
+The compile time added per type is the slope between 10 and 200 types in one translation unit (`-c -O0`, best of 3):
 
 | Added compile time per type | GCC 15, C++20 | Clang 22, C++20 | GCC 16, C++26 with `-freflection` |
 | --- | ---: | ---: | ---: |
@@ -115,7 +122,7 @@ field-reflection is not a serialization library. For JSON, see [cpp-yyjson](http
 
 For example, 100 such structs add about 2 seconds. Including the header takes 0.23 s with GCC 15, 0.30 s with Clang 22, and 0.34 s with GCC 16 and `-freflection`. Without static reflection, field-reflection and enchantum search the enumerators in [-128, 128], and magic_enum in [-128, 127]; enchantum takes 19–21 ms per enum with its default range [-256, 256].
 
-**Binary size.** A program contains only the names that it uses, and no function signatures from the reflection machinery. The table shows the size added per type (`-O2`, stripped, the sum of the sections for code, data, unwind information, and relocations):
+The binary size added per type is the sum of the sections for code, data, unwind information, and relocations (`-O2`, stripped):
 
 | Added size per type | GCC 15, C++20 | Clang 22, C++20 | GCC 16, C++26 with `-freflection` |
 | --- | ---: | ---: | ---: |
@@ -125,9 +132,9 @@ For example, 100 such structs add about 2 seconds. Including the header takes 0.
 | &nbsp;&nbsp;magic_enum | 736 B | 857 B | 829 B |
 | &nbsp;&nbsp;enchantum | 440 B | 375 B | 525 B |
 
-In short, field-reflection compiles structs about as fast as Boost.PFR, with about the same binary size. For enums, it compiles faster and produces smaller binaries than both magic_enum and enchantum with all three compilers.
-
 The libraries are Boost.PFR at commit `562a0cb`, magic_enum at commit `5de969c`, which uses static reflection with GCC 16, and enchantum at commit `6ada6cb`. Clang 22 uses libstdc++ 15.
+
+</details>
 
 ## Requirements
 
