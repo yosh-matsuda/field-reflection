@@ -45,7 +45,9 @@ int main()
     // id: 7
     // name: Alice
     // score: 3.14
-    for_each_field(u, [](std::string_view name, const auto& value) { std::cout << name << ": " << value << '\n'; });
+    for_each_field(u, [](std::string_view name, const auto& value) {
+        std::cout << name << ": " << value << '\n';
+    });
 }
 ```
 
@@ -375,10 +377,12 @@ constexpr decltype(auto) get_field(T& t) noexcept;
 
 // rvalue reference
 template <std::size_t N, typename T>
-requires field_referenceable<U> && (N < field_count<U>) && /* the field is not a C array */
+requires field_referenceable<U> && (N < field_count<U>) &&
+         /* the field is not a C array */
 constexpr auto get_field(T&& t) noexcept(/* see below */);
 template <std::size_t N, reflect_options Opts, typename T>
-requires field_referenceable<U, Opts> && (N < field_count<U, Opts>) && /* the field is not a C array */
+requires field_referenceable<U, Opts> && (N < field_count<U, Opts>) &&
+         /* the field is not a C array */
 constexpr auto get_field(T&& t) noexcept(/* see below */);
 ```
 
@@ -389,10 +393,12 @@ Get the `N`-th field of `t`. The lvalue overloads return a reference to the fiel
 ```cpp
 // U = std::remove_cvref_t<T>
 template <std::size_t N, typename T, typename V>
-requires field_referenceable<U> && (N < field_count<U>) && /* value is assignable to the field */
+requires field_referenceable<U> && (N < field_count<U>) &&
+         /* value is assignable to the field */
 constexpr void set_field(T& t, V&& value);
 template <std::size_t N, reflect_options Opts, typename T, typename V>
-requires field_referenceable<U, Opts> && (N < field_count<U, Opts>) && /* value is assignable to the field */
+requires field_referenceable<U, Opts> && (N < field_count<U, Opts>) &&
+         /* value is assignable to the field */
 constexpr void set_field(T& t, V&& value);
 ```
 
@@ -442,7 +448,9 @@ A bit-field (with the `bit_fields` option) of an lvalue is passed as a copy in a
 For example, the following code prints the fields of the `user` object `u` in [Quick start](#quick-start):
 
 ```cpp
-constexpr auto func = [](std::string_view name, const auto& value) { std::cout << name << ": " << value << '\n'; };
+constexpr auto func = [](std::string_view name, const auto& value) {
+    std::cout << name << ": " << value << '\n';
+};
 for_each_field(u, func);
 ```
 
