@@ -1757,12 +1757,17 @@ namespace field_reflection
                 }
             }
 
+            // -Wconversion warns of any assignment of a non-constant to a bit-field narrower than its type, even if
+            // the value has the type of the bit-field, and no cast can silence it.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wconversion"
             template <typename U, std::size_t N, typename T, typename V>
             constexpr void set_member(T& t, V&& value)
             {
                 constexpr auto member = member_at<U, N>;
                 t.[:member:] = std::forward<V>(value);
             }
+#pragma GCC diagnostic pop
 
             template <typename T>
             struct field_ref_storage
