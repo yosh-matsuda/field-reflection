@@ -1589,15 +1589,20 @@ namespace field_reflection
             template <typename T>
             constexpr bool tuple_like_v = tuple_like<T>;
 
+            // The results of the metafunctions are bound to local variables before the range-based for loops.
+            // GCC 16.0.1 (e.g., g++-16 on Ubuntu 26.04) rejects the destruction of a temporary std::vector<meta::info>
+            // in the range initializer as "accessing uninitialized member", which makes the concepts false.
             consteval bool is_eligible_class(meta::info type, reflect_options options)
             {
                 if (!options.non_aggregate && !meta::is_aggregate_type(type)) return false;
                 if (meta::extract<bool>(meta::substitute(^^tuple_like_v, {type}))) return false;
-                for (auto member : meta::nonstatic_data_members_of(type, meta::access_context::unchecked()))
+                const auto members = meta::nonstatic_data_members_of(type, meta::access_context::unchecked());
+                for (auto member : members)
                 {
                     if (!options.non_public && !meta::is_public(member)) return false;
                 }
-                for (auto base : meta::bases_of(type, meta::access_context::unchecked()))
+                const auto bases = meta::bases_of(type, meta::access_context::unchecked());
+                for (auto base : bases)
                 {
                     if (meta::is_virtual(base)) return false;
                     if (!options.non_public && !meta::is_public(base)) return false;
@@ -1608,7 +1613,8 @@ namespace field_reflection
 
             consteval void collect_bases(meta::info type, std::vector<meta::info>& bases)
             {
-                for (auto base : meta::bases_of(type, meta::access_context::unchecked()))
+                const auto direct_bases = meta::bases_of(type, meta::access_context::unchecked());
+                for (auto base : direct_bases)
                 {
                     bases.push_back(meta::dealias(meta::type_of(base)));
                     collect_bases(meta::type_of(base), bases);
@@ -1649,11 +1655,13 @@ namespace field_reflection
             // Members of base classes come first, in declaration order.
             consteval void collect_members(meta::info type, std::vector<meta::info>& members)
             {
-                for (auto base : meta::bases_of(type, meta::access_context::unchecked()))
+                const auto direct_bases = meta::bases_of(type, meta::access_context::unchecked());
+                for (auto base : direct_bases)
                 {
                     collect_members(meta::type_of(base), members);
                 }
-                for (auto member : meta::nonstatic_data_members_of(type, meta::access_context::unchecked()))
+                const auto direct_members = meta::nonstatic_data_members_of(type, meta::access_context::unchecked());
+                for (auto member : direct_members)
                 {
                     members.push_back(member);
                 }
