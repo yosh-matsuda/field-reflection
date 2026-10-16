@@ -8,6 +8,7 @@
 #include <string>
 #include <system_error>
 #include <variant>
+#include <vector>
 #include "field_reflection.hpp"
 
 // NOLINTBEGIN
@@ -875,6 +876,38 @@ TEST(field_reflection, c_array_members)
         }
     });
     EXPECT_EQ(*moved, 5);
+}
+// std::is_copy_constructible accepts these members, but copying them, e.g., by their initializer-list constructors,
+// fails to compile.
+struct move_only_element_members
+{
+    std::vector<std::unique_ptr<int>> v;
+    std::map<int, std::unique_ptr<move_only_element_members>> m;
+    int a[2];
+    std::string s;
+};
+struct move_only_element_member_only
+{
+    std::vector<std::unique_ptr<int>> v;
+};
+TEST(field_reflection, move_only_element_members)
+{
+    static_assert(std::is_copy_constructible_v<move_only_element_members>);
+    static_assert(field_namable<move_only_element_members>);
+    static_assert(field_count<move_only_element_members> == 4);
+    static_assert(field_name<move_only_element_members, 1> == "m");
+    static_assert(std::is_same_v<field_type<move_only_element_members, 2>, int[2]>);
+    static_assert(field_count<move_only_element_member_only> == 1);
+
+    auto s = move_only_element_members{};
+    s.v.push_back(std::make_unique<int>(6));
+    for_each_field(std::move(s), [](std::string_view name, auto&& field) {
+        if constexpr (std::is_same_v<std::remove_cvref_t<decltype(field)>, std::vector<std::unique_ptr<int>>>)
+        {
+            EXPECT_EQ(name, "v");
+            EXPECT_EQ(*field[0], 6);
+        }
+    });
 }
 struct bit_field_members
 {
