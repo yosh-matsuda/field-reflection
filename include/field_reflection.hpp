@@ -517,6 +517,13 @@ namespace field_reflection
                 }
             }();
 
+            // T{{arg}, ..., {arg}} with N initializers.  The lambda is in a concept rather than in the condition of
+            // `if constexpr` below, where MSVC 19.51 reports it as an undeclared identifier.
+            template <typename T, std::size_t N>
+            concept constructible_with_braced = []<std::size_t... Is>(std::index_sequence<Is...>) {
+                return requires { T{{any_copyable<T, Is>()}...}; };
+            }(std::make_index_sequence<N>());
+
             // The number of initializers of aggregate initialization counts the elements of C array members.
             // Count such a member as one field.
             template <typename T>
@@ -535,9 +542,7 @@ namespace field_reflection
                 }
                 // Fast path: a braced list initializes exactly one member without brace elision, so T has no C
                 // array members if each of the initializers in braces initializes T.
-                else if constexpr ([]<std::size_t... Is>(std::index_sequence<Is...>) {
-                                       return requires { T{{any_copyable<T, Is>()}...}; };
-                                   }(std::make_index_sequence<max_args>()))
+                else if constexpr (constructible_with_braced<T, max_args>)
                 {
                     return max_args;
                 }
