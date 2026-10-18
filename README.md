@@ -252,7 +252,7 @@ All entities are declared in the namespace `field_reflection`.
 * Fields: [`field_count`](#field_count), [`field_name`](#field_name), [`field_type`](#field_type), [`get_field`](#get_field), [`set_field`](#set_field), [`for_each_field`, `all_of_field`, `any_of_field`](#for_each_field-all_of_field-any_of_field), [`to_tuple`](#to_tuple)
 * Types: [`type_name`](#type_name)
 * Enumerations: [`enum_count`, `enum_values`, `enum_names`, `enum_name`, `enum_cast`, `enum_range`](#enum-names-and-values)
-* Annotations: [`field_annotations`, `field_annotation`, `type_annotations`, `type_annotation`](#annotations-c26-backend-only)
+* Annotations: [`field_annotations`, `field_annotation`, `type_annotations`, `type_annotation`, `enumerator_annotations`, `enumerator_annotation`](#annotations-c26-backend-only)
 
 ### Concepts
 
@@ -555,9 +555,16 @@ template <typename T, typename A>
 constexpr std::array<A, /* number of annotations */> type_annotations;
 template <typename T, typename A>
 constexpr std::optional<A> type_annotation;
+
+template <typename E, std::size_t I, typename A>
+requires std::is_enum_v<E> && (I < enum_count<E>)
+constexpr std::array<A, /* number of annotations */> enumerator_annotations;
+template <typename E, std::size_t I, typename A>
+requires std::is_enum_v<E> && (I < enum_count<E>)
+constexpr std::optional<A> enumerator_annotation;
 ```
 
-Get the annotations ([P3394](https://wg21.link/p3394)) of type `A` attached to the `N`-th field of `T` or to the declaration of `T`. The `field_annotations` and `type_annotations` hold all annotations of type `A` in declaration order, and the `field_annotation` and `type_annotation` hold the first one if any. These are available when the macro `FIELD_RFL_ANNOTATIONS` is defined to `1`.
+Get the annotations ([P3394](https://wg21.link/p3394)) of type `A` attached to the `N`-th field of `T`, to the declaration of `T`, or to the enumerator named `enum_names<E>[I]`. The `*_annotations` hold all annotations of type `A` in declaration order, and the `*_annotation` hold the first one if any. An alias, i.e., an enumerator declared after another of the same value, is not in `enum_names<E>`, so its annotations are not reached. These are available when the macro `FIELD_RFL_ANNOTATIONS` is defined to `1`.
 
 An annotation must be a value of a structural type. To hold a string, use `std::define_static_string`:
 
@@ -577,6 +584,15 @@ struct [[= alias_name("User")]] user
 static_assert(std::string_view(field_annotation<user, 0, alias_name>->name) == "ID");
 static_assert(!field_annotation<user, 1, alias_name>.has_value());
 static_assert(std::string_view(type_annotation<user, alias_name>->name) == "User");
+
+enum class color
+{
+    red [[= alias_name("Red")]],
+    green,
+};
+
+static_assert(std::string_view(enumerator_annotation<color, 0, alias_name>->name) == "Red");
+static_assert(!enumerator_annotation<color, 1, alias_name>.has_value());
 ```
 
 ## Examples

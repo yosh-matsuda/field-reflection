@@ -431,6 +431,14 @@ namespace std_rfl_test
         int a;
         [[= alias_name("B")]] int b : 3;
     };
+
+    enum class[[= alias_name("Status")]] annotated_enum
+    {
+        wip[[= alias_name("in-progress")]] = 2,
+        todo[[ = alias_name("to-do"), = 1, = 2 ]] = 0,
+        done = 5,
+        finished[[= alias_name("alias")]] = 5,
+    };
 }  // namespace std_rfl_test
 
 TEST(std_reflection, annotations)
@@ -451,6 +459,16 @@ TEST(std_reflection, annotations)
     // annotations do not require references to the fields
     static_assert(!field_referenceable<annotated_bit_field>);
     static_assert(std::string_view(field_annotation<annotated_bit_field, 1, alias_name>->name) == "B");
+
+    // enumerators in the order of enum_names, by value; an alias is not one of them
+    static_assert(enum_names<annotated_enum> == std::array<std::string_view, 3>{"todo", "wip", "done"});
+    static_assert(std::string_view(enumerator_annotation<annotated_enum, 0, alias_name>->name) == "to-do");
+    static_assert(enumerator_annotations<annotated_enum, 0, int> == std::array{1, 2});
+    static_assert(std::string_view(enumerator_annotation<annotated_enum, 1, alias_name>->name) == "in-progress");
+    static_assert(enumerator_annotations<annotated_enum, 1, int>.empty());
+    static_assert(!enumerator_annotation<annotated_enum, 2, alias_name>.has_value());
+    static_assert(enumerator_annotation<const annotated_enum, 1, alias_name>.has_value());
+    static_assert(std::string_view(type_annotation<annotated_enum, alias_name>->name) == "Status");
 }
 #endif
 // NOLINTEND
