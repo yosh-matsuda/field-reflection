@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 project(
   field_reflection
-  VERSION 1.1.0
+  VERSION 1.1.1
   LANGUAGES CXX)
 
 # check if the project is top-level
